@@ -5,7 +5,10 @@ name: Installers
 # installed on a clean CI machine of its own OS and the installed app is run
 # against a recorded Japji Sahib paath before anything is published.
 #
-#   Push a tag v1.2.3 (matching package.json) -> GitHub Release with the installers
+#   Merge to main with a new "version" in package.json -> GitHub Release vX.Y.Z
+#                                     (the tag is created by this workflow; versions
+#                                     already released are skipped without building)
+#   Push a tag v1.2.3 (matching package.json) -> the same release, by tag
 #   Run manually ("Run workflow")              -> installers as workflow artifacts;
 #                                                 tick "prerelease" to also publish a test release
 #   Pull requests touching packaging           -> build and install-test only
@@ -17,6 +20,7 @@ name: Installers
 #   Windows: WIN_CSC_LINK (base64 .pfx), WIN_CSC_KEY_PASSWORD
 on:
   push:
+    branches: [main]
     tags: ['v*']
   pull_request:
     paths:
@@ -44,8 +48,52 @@ permissions:
   contents: read
 
 jobs:
+  plan:
+    name: Decide what to build and publish
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      publish: ${{ steps.plan.outputs.publish }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE_INPUT: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          build=true publish=false prerelease=false tag="v$version"
+          case "$GITHUB_EVENT_NAME:$GITHUB_REF_TYPE" in
+            push:tag)
+              if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+                echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version. Update package.json or re-tag."
+                exit 1
+              fi
+              publish=true ;;
+            push:branch)
+              if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+                echo "v$version is already released: nothing to build"
+                build=false
+              else
+                echo "v$version has no release yet: building and publishing it"
+                publish=true
+              fi ;;
+            workflow_dispatch:*)
+              if [ "$PRERELEASE_INPUT" = true ]; then
+                publish=true prerelease=true tag="v$version-test.$GITHUB_RUN_NUMBER"
+              fi ;;
+          esac
+          echo "build=$build publish=$publish prerelease=$prerelease tag=$tag"
+          { echo "build=$build"; echo "publish=$publish"; echo "prerelease=$prerelease"; echo "tag=$tag"; } >> "$GITHUB_OUTPUT"
+
   build:
     name: ${{ matrix.label }}
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -65,16 +113,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-
-      - name: Check the tag matches package.json
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        run: |
-          version=$(node -p "require('./package.json').version")
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version. Update package.json or re-tag."
-            exit 1
-          fi
 
       - name: Install and build
         run: |
@@ -223,8 +261,8 @@ jobs:
 
   release:
     name: Publish release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.prerelease)
+    needs: [plan, build]
+    if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -240,6 +278,8 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          PRERELEASE: ${{ needs.plan.outputs.prerelease }}
         run: |
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
@@ -247,10 +287,13 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
           cd ..
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            tag="$GITHUB_REF_NAME"; title="Kirtan Saathi $version"; flags=()
+          tag="$TAG"
+          # --target creates the tag on this commit when it does not exist yet
+          # (merge to main); an existing tag (tag push) is used as is.
+          if [ "$PRERELEASE" = true ]; then
+            title="Kirtan Saathi $version (test build $GITHUB_RUN_NUMBER)"; flags=(--prerelease --target "$GITHUB_SHA")
           else
-            tag="v$version-test.$GITHUB_RUN_NUMBER"; title="Kirtan Saathi $version (test build $GITHUB_RUN_NUMBER)"; flags=(--prerelease --target "$GITHUB_SHA")
+            title="Kirtan Saathi $version"; flags=(--target "$GITHUB_SHA")
           fi
           sed -e "s/{{VERSION}}/$version/g" -e "s/{{TAG}}/$tag/g" .github/release-notes.md > notes.md
           gh release create "$tag" dist-installers/* --title "$title" --notes-file notes.md "${flags[@]}"

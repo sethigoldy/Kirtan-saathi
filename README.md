@@ -244,9 +244,10 @@ Darbar Sahib kirtan broadcasts show the Gurbani line on screen, and the caption 
 
 ### Releasing a version
 
-1. Set `"version"` in `package.json` (semantic versioning: `0.1.1` fixes, `0.2.0` features) and merge to `main`.
-2. Tag the release with the same version: `git tag v0.2.0 && git push origin v0.2.0`.
-3. The *Installers* workflow publishes the release once all four installers pass their install test.
+1. Set `"version"` in `package.json` in your pull request. Use semantic versioning: `0.1.1` for fixes, `0.2.0` for features.
+2. Merge it to `main`. The *Installers* workflow sees that `v0.2.0` has no release yet and builds all four installers. Once all of them pass their install test, it publishes the **v0.2.0** release and creates its tag.
+
+Merges that don't change the version build nothing. Pushing a tag `vX.Y.Z` that matches `package.json` also publishes that version.
 
 To get a test build without tagging, use *Actions → Installers → Run workflow*. Tick *prerelease* to publish it as a pre-release.
 
