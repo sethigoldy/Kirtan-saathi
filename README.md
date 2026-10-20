@@ -77,6 +77,7 @@ Get the installer for your computer from the [Releases page](https://github.com/
 | zOtIpxMT9hU (Maaroo M5, 4.9 min) | 47.4% | 69.9% | 79.8% | 163 s / 66 s / 17 s |
 | **Overall** | | | | **88.9%** (3046/3425 frames) |
 
+- **CI runners.** GitHub's runners decode slightly differently and score the same code at 87.7%. `ci/baseline.json` holds the CI numbers; the gate is 87%.
 - **Reference points.** The published reference system scores 57.9%. A perfect transcript delayed by 5 s scores 85.5%. Scores are cross-checked with the benchmark's own `eval.py`.
 - **No wrong shabads.** No frame showed a wrong shabad in any case. Adding each decode's measured latency leaves the score unchanged.
 - **Where errors are.** 8.4% of frames are lost before the first lock and 2.7% to the wrong line while locked, mostly the ~1 s lag at line changes. Identification is the lever.

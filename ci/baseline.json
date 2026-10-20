@@ -1,19 +1,19 @@
 {
-  "commit": "baseline (Phase 2)",
+  "commit": "044252c777de7e4f055f9974288896bcdc9d6d8d",
   "kirtan": {
-    "frameAccuracy": 88.93,
+    "frameAccuracy": 87.74,
     "wrongShabadSec": 0,
-    "medianFirstLockSec": 15,
+    "medianFirstLockSec": 14,
     "cases": [
       {
         "id": "IZOsmkdmmcg",
-        "accuracy": 97.58,
+        "accuracy": 94.07,
         "firstCorrectLockSec": 7,
         "wrongShabadSec": 0
       },
       {
         "id": "IZOsmkdmmcg_cold33",
-        "accuracy": 97.08,
+        "accuracy": 91.88,
         "firstCorrectLockSec": 5,
         "wrongShabadSec": 0
       },
@@ -25,14 +25,14 @@
       },
       {
         "id": "kZhIA8P6xWI",
-        "accuracy": 91.09,
+        "accuracy": 91.42,
         "firstCorrectLockSec": 28,
         "wrongShabadSec": 0
       },
       {
         "id": "kZhIA8P6xWI_cold33",
         "accuracy": 89.37,
-        "firstCorrectLockSec": 15,
+        "firstCorrectLockSec": 14,
         "wrongShabadSec": 0
       },
       {
@@ -43,14 +43,14 @@
       },
       {
         "id": "kchMJPK9Axs",
-        "accuracy": 96.76,
+        "accuracy": 96.92,
         "firstCorrectLockSec": 9,
         "wrongShabadSec": 0
       },
       {
         "id": "kchMJPK9Axs_cold33",
-        "accuracy": 93.15,
-        "firstCorrectLockSec": 23,
+        "accuracy": 93.61,
+        "firstCorrectLockSec": 21,
         "wrongShabadSec": 0
       },
       {
@@ -61,7 +61,7 @@
       },
       {
         "id": "zOtIpxMT9hU",
-        "accuracy": 47.39,
+        "accuracy": 47.74,
         "firstCorrectLockSec": 163,
         "wrongShabadSec": 0
       },
@@ -73,8 +73,8 @@
       },
       {
         "id": "zOtIpxMT9hU_cold66",
-        "accuracy": 79.8,
-        "firstCorrectLockSec": 17,
+        "accuracy": 65.66,
+        "firstCorrectLockSec": 80,
         "wrongShabadSec": 0
       }
     ]
@@ -87,11 +87,11 @@
       "clips": 300,
       "unlabeled": 0,
       "lines": 300,
-      "exact": 80.58,
+      "exact": 80.63,
       "within1": 97.91,
       "farOff": 0,
-      "lagMedian": 0.68,
-      "lagP90": 1.15,
+      "lagMedian": 0.69,
+      "lagP90": 1.09,
       "missed": 2,
       "firstDisplaySec": 6,
       "unlocks": 0,
@@ -104,11 +104,11 @@
       "clips": 173,
       "unlabeled": 0,
       "lines": 173,
-      "exact": 82.82,
+      "exact": 82.88,
       "within1": 98.2,
       "farOff": 0,
-      "lagMedian": 0.69,
-      "lagP90": 1.12,
+      "lagMedian": 0.68,
+      "lagP90": 1.13,
       "missed": 3,
       "firstDisplaySec": 16,
       "unlocks": 0,
@@ -121,8 +121,8 @@
       "clips": 385,
       "unlabeled": 0,
       "lines": 385,
-      "exact": 79.51,
-      "within1": 99.65,
+      "exact": 79.47,
+      "within1": 99.69,
       "farOff": 0,
       "lagMedian": 0.63,
       "lagP90": 1,
