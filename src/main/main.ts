@@ -16,7 +16,7 @@ function resourcePaths(): { models: string; corpus: string } {
 
 function startEngine(): UtilityProcess {
   const child = utilityProcess.fork(join(__dirname, 'engine-host.js'), [], {
-    serviceName: 'gurbani-engine',
+    serviceName: 'kirtan-saathi-engine',
     stdio: 'pipe',
   });
   child.stdout?.on('data', (d) => process.stdout.write(`[engine] ${d}`));
@@ -49,7 +49,7 @@ function createWindow(): void {
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    title: 'Gurbani Live',
+    title: 'Kirtan Saathi',
     backgroundColor: '#14110f',
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
@@ -71,6 +71,7 @@ function createWindow(): void {
  * Smoke test (development only): GURBANI_SMOKE=<16 kHz mono wav> streams the
  * file through the renderer at real-time pace, saves a screenshot to
  * GURBANI_SMOKE_SHOT (default smoke.png) after GURBANI_SMOKE_SECONDS, quits.
+ * GURBANI_SMOKE_MODE selects the mode first (kirtan, paath, bani:<ID>).
  */
 function smokeTest(): void {
   const file = process.env.GURBANI_SMOKE;
@@ -81,6 +82,8 @@ function smokeTest(): void {
   const offset = Math.round(Number(process.env.GURBANI_SMOKE_OFFSET ?? 0) * 16000);
   const seconds = Number(process.env.GURBANI_SMOKE_SECONDS ?? 60);
   const shot = process.env.GURBANI_SMOKE_SHOT ?? 'smoke.png';
+  const mode = process.env.GURBANI_SMOKE_MODE;
+  if (mode) win.webContents.send('smoke-mode', mode);
   let pos = offset;
   const started = Date.now();
   const timer = setInterval(() => {

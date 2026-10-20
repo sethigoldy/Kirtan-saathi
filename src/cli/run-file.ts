@@ -2,7 +2,8 @@
  * Follow any audio file from the command line and print the timeline of
  * shabad and line changes (canonical text only).
  *
- * Usage: npm run run-file -- <audio file> [--start <sec>] [--debug]
+ * Usage: npm run run-file -- <audio file> [--mode kirtan|paath|bani:<ID>] [--start <sec>] [--debug]
+ * Bani IDs: JAPJ (Japji), JAAP (Jaap), RHRS (Rehras), SHLA (Sohila), ANND (Anand), SKMI (Sukhmani), ...
  * Non-WAV input needs ffmpeg on PATH.
  */
 import { resolve } from 'node:path';
@@ -25,13 +26,15 @@ function clock(t: number): string {
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file || file.startsWith('--')) {
-    console.error('usage: npm run run-file -- <audio file> [--start <sec>] [--debug]');
+    console.error('usage: npm run run-file -- <audio file> [--mode kirtan|paath|bani:<ID>] [--start <sec>] [--debug]');
     process.exit(2);
   }
   const corpus = Corpus.load(resolve('resources/corpus.json.gz'));
   const retriever = new Retriever(corpus);
   const model = await AsrModel.load(resolve('models/model.int8.onnx'), resolve('models/edge-vocab.json'));
   const engine = new Engine(corpus, retriever, { transcribe: (s) => model.transcribe(s) });
+  const modeArg = arg('mode') ?? 'kirtan';
+  engine.setMode(modeArg.startsWith('bani:') ? { kind: 'bani', id: modeArg.slice(5) } : { kind: modeArg as 'kirtan' | 'paath' });
   const audio = loadAudio(file);
   const start = Math.round(Number(arg('start') ?? 0) * SAMPLE_RATE);
   const debug = process.argv.includes('--debug');

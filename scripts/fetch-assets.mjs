@@ -5,6 +5,7 @@
 // is already committed, so this step is only needed to rebuild it).
 //
 // Behind a proxy on Node >= 22.21, run with NODE_USE_ENV_PROXY=1.
+// --model-only skips the database (CI and end users only need the model).
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -55,6 +56,11 @@ for (const f of MODEL_FILES) {
   const buf = await download(f.url);
   if (buf.length < f.minBytes) throw new Error(`${f.url}: unexpectedly small (${buf.length} bytes)`);
   save(f.out, buf);
+}
+
+if (process.argv.includes('--model-only')) {
+  console.log('done (model only)');
+  process.exit(0);
 }
 
 if (existsSync(SHABADOS_OUT)) {

@@ -3,14 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; media-src 'self' blob:; script-src 'self'" />
-  <title>Gurbani Live</title>
+  <title>Kirtan Saathi</title>
   <link rel="stylesheet" href="../static/styles.css" />
 </head>
 <body>
   <header class="bar">
-    <div class="brand">Gurbani Live <span class="phase">Phase 1</span></div>
+    <div class="brand">Kirtan Saathi <span class="phase">Phase 2</span></div>
     <div id="status" class="pill pill-idle">Starting engine…</div>
     <div class="controls">
+      <select id="mode" title="What is being recited">
+        <option value="kirtan">Kirtan</option>
+        <option value="paath">Paath — reading order</option>
+        <optgroup id="banis" label="Bani"></optgroup>
+      </select>
       <select id="device" title="Input device"></select>
       <button id="mic" class="primary" disabled>Start listening</button>
       <label class="button" title="Play a recording and follow it">
@@ -25,6 +30,7 @@
     <section class="stage">
       <div id="now" class="now empty">
         <div id="now-line" class="tuk">ਉਡੀਕ…</div>
+        <div id="next-line" class="next"></div>
         <div id="now-meta" class="meta">Listening for Gurbani</div>
       </div>
       <ol id="lines" class="lines"></ol>

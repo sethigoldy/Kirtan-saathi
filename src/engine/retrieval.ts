@@ -160,6 +160,81 @@ export class Retriever {
     return ref;
   }
 
+  /**
+   * Align a query against an ordered run of lines (any lines, headings
+   * included). Returns the fraction of the query explained, the line where
+   * the alignment ends, and how far into that line it got (in key units).
+   */
+  alignLines(key: string, lines: readonly number[], floor = this.opts.queryFloor): {
+    score: number;
+    querySelf: number;
+    queryLength: number;
+    endIndex: number;
+    endInto: number;
+    endLineLength: number;
+    qEnd: number;
+  } {
+    const q = encodeKey(key);
+    const querySelf = selfScore(q);
+    if (!lines.length || q.length === 0) {
+      return { score: 0, querySelf, queryLength: q.length, endIndex: -1, endInto: 0, endLineLength: 0, qEnd: 0 };
+    }
+    const ref = this.buildRef(lines as number[]);
+    const al = this.aligner.align(q, ref.codes, ref.restart);
+    const endPos = Math.max(0, Math.min(ref.lineAt.length - 1, al.rEnd - 1));
+    const endLine = ref.lineAt[endPos];
+    let lineStart = endPos;
+    while (lineStart > 0 && ref.lineAt[lineStart - 1] === endLine) lineStart--;
+    return {
+      score: al.score / Math.max(querySelf, floor),
+      querySelf,
+      queryLength: q.length,
+      endIndex: lines.indexOf(endLine),
+      endInto: al.rEnd - lineStart,
+      endLineLength: this.codes[endLine].length,
+      qEnd: al.qEnd,
+    };
+  }
+
+  /**
+   * For each line of an ordered run: how well the most recent part of the
+   * query ends inside that line (fraction of the query explained by the best
+   * path ending there) and how far into the line that path got.
+   */
+  endScores(key: string, lines: readonly number[], floor = this.opts.queryFloor, endRows = 6, allowRestarts = false, minInto = 3): {
+    querySelf: number;
+    /** score: best path ending anywhere in the line; scoreInto: ending at least `minInto` units in. */
+    perLine: { score: number; into: number; scoreInto: number; length: number }[];
+  } {
+    const q = encodeKey(key);
+    const querySelf = selfScore(q);
+    const perLine = lines.map((l) => ({ score: 0, into: 0, scoreInto: 0, length: this.codes[l].length }));
+    if (!lines.length || q.length === 0) return { querySelf, perLine };
+    const ref = this.buildRef(lines as number[]);
+    const endBest = new Float32Array(ref.codes.length);
+    // Without restarts a path is contiguous text (reading continues from one
+    // line into the next); with them, every line would inherit the score of
+    // the best match elsewhere plus one cheap jump.
+    const restart = allowRestarts ? ref.restart : new Float32Array(ref.codes.length).fill(Infinity);
+    this.aligner.align(q, ref.codes, restart, 0, ref.codes.length, endBest, endRows);
+    const norm = Math.max(querySelf, floor);
+    let p = 0;
+    for (let k = 0; k < lines.length; k++) {
+      const len = perLine[k].length;
+      for (let j = 0; j < len; j++) {
+        const s = endBest[p + j] / norm;
+        // Ties prefer the later position: the reader has got further.
+        if (s > 0 && s >= perLine[k].score) {
+          perLine[k].score = s;
+          perLine[k].into = j + 1;
+        }
+        if (j + 1 >= Math.min(minInto, len) && s > perLine[k].scoreInto) perLine[k].scoreInto = s;
+      }
+      p += len;
+    }
+    return { querySelf, perLine };
+  }
+
   /** Candidate lines by n-gram overlap (characters + consonant skeleton), best first. */
   candidateLines(q: Uint8Array, limit: number): { line: number; s: number }[] {
     const scores = new Map<number, number>();

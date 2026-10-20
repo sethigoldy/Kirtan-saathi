@@ -15,6 +15,8 @@ let port: MessagePort | null = null;
 let shabad: UiShabad | null = null;
 let currentLine: number | null = null;
 let capture: { stop: () => void } | null = null;
+let mode: 'kirtan' | 'paath' | 'bani' = 'kirtan';
+let streamName: string | null = null;
 
 /**
  * Audio is sent by copy: ArrayBuffer transfer does not survive the hop into
@@ -69,15 +71,23 @@ function highlight(): void {
     if (on) li.scrollIntoView({ block: 'nearest' });
   }
   const now = $('now');
-  const line = shabad?.lines.find((l) => l.line === currentLine);
+  const idx = shabad ? shabad.lines.findIndex((l) => l.line === currentLine) : -1;
+  const line = idx >= 0 ? shabad!.lines[idx] : undefined;
   if (line) {
     now.classList.remove('empty');
     renderTuk($('now-line'), line.text);
+    // Paath moves quickly: preview the next line.
+    const next = mode !== 'kirtan' ? shabad!.lines[idx + 1] : undefined;
+    if (next) renderTuk($('next-line'), next.text);
+    else $('next-line').textContent = '';
     const s = shabad!;
-    $('now-meta').textContent = [s.source, s.section, s.author, s.page > 0 ? `page ${s.page}` : ''].filter(Boolean).join(' · ');
+    $('now-meta').textContent = [streamName && streamName !== s.source ? streamName : '', s.source, s.section, s.author, s.page > 0 ? `page ${s.page}` : '']
+      .filter(Boolean)
+      .join(' · ');
   } else {
     now.classList.add('empty');
     $('now-line').textContent = 'ਉਡੀਕ…';
+    $('next-line').textContent = '';
     $('now-meta').textContent = shabad ? 'Locked — waiting for a confident line' : 'Listening for Gurbani';
   }
 }
@@ -138,11 +148,20 @@ function renderStats(ev: UiEvent | null, ready?: Extract<FromEngine, { type: 're
 
 function onEngine(msg: FromEngine): void {
   switch (msg.type) {
-    case 'ready':
+    case 'ready': {
       setStatus('idle', 'Ready');
       $<HTMLButtonElement>('mic').disabled = false;
+      const group = $('banis');
+      group.textContent = '';
+      for (const b of msg.banis) {
+        const o = document.createElement('option');
+        o.value = `bani:${b.id}`;
+        o.textContent = `${b.nameEn} — ${b.name}`;
+        group.append(o);
+      }
       renderStats(null, msg);
       break;
+    }
     case 'error': {
       const el = $('error');
       el.hidden = false;
@@ -159,6 +178,8 @@ function onEngine(msg: FromEngine): void {
       const ev = msg.ev;
       if (ev.state === 'locked') setStatus('locked', `Locked · ${(ev.confidence * 100).toFixed(0)}%`);
       else if (ev.state === 'searching') setStatus('searching', 'Searching…');
+      mode = ev.mode;
+      streamName = ev.stream;
       currentLine = ev.line;
       highlight();
       renderCandidates($<HTMLOListElement>('candidates'), ev.candidates, 'No candidates yet');
@@ -267,6 +288,13 @@ function stopCapture(): void {
 }
 
 window.addEventListener('message', (e) => {
+  const smokeMode = (e.data as { smokeMode?: string } | null)?.smokeMode;
+  if (smokeMode) {
+    const sel = $<HTMLSelectElement>('mode');
+    sel.value = smokeMode;
+    sel.dispatchEvent(new Event('change'));
+    return;
+  }
   const smoke = (e.data as { smokeAudio?: Float32Array } | null)?.smokeAudio;
   if (smoke) {
     showLevel(smoke);
@@ -304,6 +332,11 @@ $<HTMLInputElement>('file').addEventListener('change', async (e) => {
 });
 
 $('reset').addEventListener('click', () => send({ type: 'reset' }));
+
+$<HTMLSelectElement>('mode').addEventListener('change', (e) => {
+  const v = (e.target as HTMLSelectElement).value;
+  send({ type: 'mode', mode: v.startsWith('bani:') ? { kind: 'bani', id: v.slice(5) } : { kind: v as 'kirtan' | 'paath' } });
+});
 
 $('search-form').addEventListener('submit', (e) => {
   e.preventDefault();

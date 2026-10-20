@@ -1,7 +1,12 @@
 /** Messages between the renderer and the engine utility process. */
 
+import type { EngineMode } from '../engine/mode';
+
+export type { EngineMode };
+
 export type ToEngine =
   | { type: 'audio'; samples: Float32Array }
+  | { type: 'mode'; mode: EngineMode }
   | { type: 'lock'; shabad: number; line?: number | null }
   | { type: 'setLine'; line: number }
   | { type: 'reset' }
@@ -41,6 +46,8 @@ export interface UiEvent {
   line: number | null;
   confidence: number;
   reason: string;
+  mode: EngineMode['kind'];
+  stream: string | null;
   candidates: UiCandidate[];
   asrText: string;
   inferMs: number;
@@ -49,7 +56,16 @@ export interface UiEvent {
 }
 
 export type FromEngine =
-  | { type: 'ready'; lines: number; shabads: number; threads: number; loadMs: number; selfTestRtf: number; provenance: string }
+  | {
+      type: 'ready';
+      lines: number;
+      shabads: number;
+      threads: number;
+      loadMs: number;
+      selfTestRtf: number;
+      provenance: string;
+      banis: { id: string; name: string; nameEn: string; lines: number }[];
+    }
   | { type: 'error'; message: string }
   | { type: 'event'; ev: UiEvent }
   | { type: 'shabad'; shabad: UiShabad | null }

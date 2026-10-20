@@ -18,7 +18,34 @@ function arg(name: string, def: string): string {
   return i >= 0 ? process.argv[i + 1] : def;
 }
 
+/** Paath streams: every follow window ending on a 0.5 s grid (search windows decode on demand). */
+async function prefillStream(model: AsrModel, wav: string, id: string): Promise<void> {
+  const audio = loadAudio(wav);
+  const asr = new CachedTranscriber(model, resolve('.cache/asr'), id, 0);
+  const o = DEFAULT_ENGINE_OPTIONS;
+  const dur = audio.length / SAMPLE_RATE;
+  let done = 0;
+  for (let end = 1; end <= dur; end += 0.5) {
+    for (const w of [o.paathWindowSec]) {
+      const start = Math.round(Math.max(0, end - w) * SAMPLE_RATE);
+      const n = Math.round(end * SAMPLE_RATE) - start;
+      if (n < SAMPLE_RATE) continue;
+      await asr.transcribe(audio.subarray(start, start + n), start);
+      if (++done % 300 === 0) asr.save();
+    }
+  }
+  asr.save();
+  console.log(`${id}: ${asr.misses} decoded, ${asr.hits} cached`);
+}
+
 async function main(): Promise<void> {
+  const streams = process.argv.indexOf('--streams');
+  if (streams >= 0) {
+    const model = await AsrModel.load(resolve('models/model.int8.onnx'), resolve('models/edge-vocab.json'));
+    const dir = resolve(arg('dir', '../work/paath'));
+    for (const name of process.argv[streams + 1].split(',')) await prefillStream(model, join(dir, `${name}.wav`), `paath-${name}`);
+    return;
+  }
   const gtDir = resolve(arg('gt', '../work/bench/test'));
   const audioDir = resolve(arg('audio', '../work/audio'));
   const model = await AsrModel.load(resolve('models/model.int8.onnx'), resolve('models/edge-vocab.json'));

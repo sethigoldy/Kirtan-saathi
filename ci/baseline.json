@@ -1,0 +1,135 @@
+{
+  "commit": "baseline (Phase 2)",
+  "kirtan": {
+    "frameAccuracy": 88.93,
+    "wrongShabadSec": 0,
+    "medianFirstLockSec": 15,
+    "cases": [
+      {
+        "id": "IZOsmkdmmcg",
+        "accuracy": 97.58,
+        "firstCorrectLockSec": 7,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "IZOsmkdmmcg_cold33",
+        "accuracy": 97.08,
+        "firstCorrectLockSec": 5,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "IZOsmkdmmcg_cold66",
+        "accuracy": 96.15,
+        "firstCorrectLockSec": 8,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "kZhIA8P6xWI",
+        "accuracy": 91.09,
+        "firstCorrectLockSec": 28,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "kZhIA8P6xWI_cold33",
+        "accuracy": 89.37,
+        "firstCorrectLockSec": 15,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "kZhIA8P6xWI_cold66",
+        "accuracy": 89.52,
+        "firstCorrectLockSec": 7,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "kchMJPK9Axs",
+        "accuracy": 96.76,
+        "firstCorrectLockSec": 9,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "kchMJPK9Axs_cold33",
+        "accuracy": 93.15,
+        "firstCorrectLockSec": 23,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "kchMJPK9Axs_cold66",
+        "accuracy": 94.59,
+        "firstCorrectLockSec": 7,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "zOtIpxMT9hU",
+        "accuracy": 47.39,
+        "firstCorrectLockSec": 163,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "zOtIpxMT9hU_cold33",
+        "accuracy": 69.9,
+        "firstCorrectLockSec": 66,
+        "wrongShabadSec": 0
+      },
+      {
+        "id": "zOtIpxMT9hU_cold66",
+        "accuracy": 79.8,
+        "firstCorrectLockSec": 17,
+        "wrongShabadSec": 0
+      }
+    ]
+  },
+  "paath": [
+    {
+      "name": "val-1090",
+      "mode": "paath",
+      "minutes": 23.2,
+      "clips": 300,
+      "unlabeled": 0,
+      "lines": 300,
+      "exact": 80.58,
+      "within1": 97.91,
+      "farOff": 0,
+      "lagMedian": 0.68,
+      "lagP90": 1.15,
+      "missed": 2,
+      "firstDisplaySec": 6,
+      "unlocks": 0,
+      "uncachedWindows": 0
+    },
+    {
+      "name": "ang14",
+      "mode": "paath",
+      "minutes": 15,
+      "clips": 173,
+      "unlabeled": 0,
+      "lines": 173,
+      "exact": 82.82,
+      "within1": 98.2,
+      "farOff": 0,
+      "lagMedian": 0.69,
+      "lagP90": 1.12,
+      "missed": 3,
+      "firstDisplaySec": 16,
+      "unlocks": 0,
+      "uncachedWindows": 0
+    },
+    {
+      "name": "japji",
+      "mode": "bani:JAPJ",
+      "minutes": 24.6,
+      "clips": 385,
+      "unlabeled": 0,
+      "lines": 385,
+      "exact": 79.51,
+      "within1": 99.65,
+      "farOff": 0,
+      "lagMedian": 0.63,
+      "lagP90": 1,
+      "missed": 1,
+      "firstDisplaySec": 3,
+      "unlocks": 0,
+      "uncachedWindows": 0
+    }
+  ]
+}

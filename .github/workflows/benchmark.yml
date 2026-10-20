@@ -1,0 +1,126 @@
+name: Benchmark
+
+# Full accuracy benchmark when code is merged to main, on pull requests into
+# main, and on demand. Fails if a regression gate in ci/thresholds.json is
+# crossed; reports deltas against ci/baseline.json.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark:
+    name: Kirtan + paath benchmark
+    runs-on: ubuntu-latest
+    # The first run decodes ~90 min of audio; later runs reuse the decode cache.
+    timeout-minutes: 150
+    env:
+      npm_config_onnxruntime_node_install: skip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: System packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg xvfb
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Cache acoustic model
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: model-karansea-int8-v1
+
+      - name: Fetch acoustic model
+        run: npm run fetch-assets -- --model-only
+
+      - name: Cache evaluation data
+        uses: actions/cache@v4
+        with:
+          path: .bench-data
+          key: bench-data-${{ hashFiles('scripts/fetch-bench-data.sh', 'scripts/make-paath-streams.py') }}
+
+      - name: Fetch evaluation data
+        run: |
+          pip install --quiet pyarrow soundfile numpy
+          bash scripts/fetch-bench-data.sh .bench-data
+
+      # Decoded windows depend only on the model and the audio, so they are
+      # cached across runs; matcher/tracker changes then benchmark in minutes.
+      - name: Restore decode cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/asr
+          key: asr-${{ hashFiles('models/model.int8.onnx') }}-${{ github.run_id }}
+          restore-keys: asr-${{ hashFiles('models/model.int8.onnx') }}-
+
+      - name: Run benchmark
+        run: node dist/cli/ci-bench.js --data .bench-data --out bench-results
+
+      - name: Save decode cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/asr
+          key: asr-${{ hashFiles('models/model.int8.onnx') }}-${{ github.run_id }}
+
+      - name: App smoke test (Electron under Xvfb)
+        if: always()
+        env:
+          GURBANI_SMOKE: .bench-data/audio/IZOsmkdmmcg_16k.wav
+          GURBANI_SMOKE_SECONDS: '45'
+          GURBANI_SMOKE_SHOT: bench-results/app-smoke.png
+        run: |
+          mkdir -p bench-results
+          xvfb-run -a -s "-screen 0 1400x900x24" npx electron . --no-sandbox --disable-gpu 2>&1 | tee bench-results/app-smoke.log
+          grep -q "smoke: streamed" bench-results/app-smoke.log
+
+      - name: Publish summary
+        if: always()
+        run: |
+          if [ -f bench-results/summary.md ]; then cat bench-results/summary.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Comment on pull request
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'bench-results/summary.md';
+            if (!fs.existsSync(path)) return;
+            const marker = '<!-- kirtan-saathi-benchmark -->';
+            const body = `${marker}\n${fs.readFileSync(path, 'utf8')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const mine = comments.find((c) => c.body && c.body.startsWith(marker));
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: bench-results

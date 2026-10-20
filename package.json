@@ -1,7 +1,7 @@
 {
-  "name": "gurbani-live",
-  "version": "0.1.0",
-  "description": "Offline live Gurbani shabad detection and line following (Phase 1)",
+  "name": "kirtan-saathi",
+  "version": "0.2.0",
+  "description": "Kirtan Saathi: offline live Gurbani shabad detection and line following for kirtan, paath and banis",
   "private": true,
   "license": "MIT",
   "main": "dist/main/main.js",
@@ -15,7 +15,10 @@
     "bench": "node dist/cli/bench.js",
     "score": "node dist/cli/score.js",
     "test": "npm run build && node --test \"dist/test/*.test.js\"",
-    "calibrate": "node dist/cli/calibrate.js"
+    "calibrate": "node dist/cli/calibrate.js",
+    "paath-eval": "node dist/cli/paath-eval.js",
+    "ci-bench": "node dist/cli/ci-bench.js",
+    "soak": "node dist/cli/soak.js"
   },
   "dependencies": {
     "@fontsource/noto-sans-gurmukhi": "^5.3.0",

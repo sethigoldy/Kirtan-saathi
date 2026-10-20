@@ -9,6 +9,7 @@ import { AsrModel, SAMPLE_RATE } from '../engine/asr';
 import { Corpus } from '../engine/corpus';
 import { Engine, type EngineEvent, type Transcriber } from '../engine/engine';
 import { Retriever } from '../engine/retrieval';
+import { Pacer } from '../engine/pacer';
 import type { FromEngine, ToEngine, UiCandidate, UiShabad } from './protocol';
 
 interface ParentPortLike {
@@ -31,6 +32,7 @@ let retriever: Retriever | null = null;
 let ready: FromEngine | null = null;
 let lastShabad: number | null | undefined;
 let pumping = false;
+const pacer = new Pacer();
 
 function send(msg: FromEngine): void {
   port?.postMessage(msg);
@@ -66,10 +68,12 @@ function candidate(shabad: number, line: number, score: number, evidence: number
 /** Adjust hop lengths so decoding keeps up with real time on this machine. */
 function pace(ev: EngineEvent): void {
   const e = engine!;
-  const hop = ev.state === 'locked' ? e.opts.followHopSec : e.opts.searchHopSec;
-  const budgetMs = hop * e.opts.paceScale * 1000;
-  if (ev.inferMs > 0.8 * budgetMs) e.opts.paceScale = Math.min(4, e.opts.paceScale * 1.25);
-  else if (ev.inferMs < 0.3 * budgetMs) e.opts.paceScale = Math.max(1, e.opts.paceScale / 1.1);
+  if (ev.reason === 'search' || ev.state === 'searching') {
+    e.opts.paceScale = pacer.observe(ev.inferMs, e.opts.searchHopSec);
+  } else {
+    const hop = ev.mode === 'kirtan' ? e.opts.followHopSec : e.opts.paathHopSec;
+    e.opts.paceScale = pacer.observe(ev.inferMs, hop);
+  }
 }
 
 function emit(ev: EngineEvent): void {
@@ -87,6 +91,8 @@ function emit(ev: EngineEvent): void {
       line: ev.line,
       confidence: ev.confidence,
       reason: ev.reason,
+      mode: ev.mode,
+      stream: ev.stream,
       candidates: ev.candidates.map((c) => candidate(c.shabad, c.line, c.score, c.evidence)),
       asrText: ev.asrText,
       inferMs: ev.inferMs,
@@ -118,6 +124,11 @@ function handle(msg: ToEngine | null): void {
       if (!(msg.samples instanceof Float32Array)) return;
       engine.pushAudio(msg.samples);
       void pump();
+      break;
+    case 'mode':
+      engine.setMode(msg.mode);
+      lastShabad = undefined;
+      send({ type: 'shabad', shabad: null });
       break;
     case 'lock':
       engine.lock(msg.shabad, msg.line ?? null);
@@ -172,8 +183,9 @@ async function init(paths: { models: string; corpus: string }): Promise<void> {
   const r = await model.transcribe(probe);
   const rtf = r.inferMs / 5000;
   engine = new Engine(corpus, retriever, transcriber);
-  // Follow decodes 5 s every 0.5 s: keep each decode under ~60% of the hop.
-  engine.opts.paceScale = Math.min(4, Math.max(1, r.inferMs / (0.6 * engine.opts.followHopSec * 1000)));
+  // Kirtan follow decodes 5 s every 0.5 s: start at a tier where that fits.
+  pacer.calibrate(r.inferMs, 5, engine.opts.followHopSec, engine.opts.followWindowSec);
+  engine.opts.paceScale = pacer.scale;
 
   ready = {
     type: 'ready',
@@ -183,6 +195,10 @@ async function init(paths: { models: string; corpus: string }): Promise<void> {
     loadMs: Date.now() - t0,
     selfTestRtf: rtf,
     provenance: `${corpus.provenance.name} ${corpus.provenance.version}`,
+    banis: corpus.banis
+      .filter((b) => b.lines.length > 0)
+      .map((b) => ({ id: b.id, name: b.name, nameEn: b.nameEn, lines: b.lines.length }))
+      .sort((a, b) => a.nameEn.localeCompare(b.nameEn)),
   };
   send(ready);
 }

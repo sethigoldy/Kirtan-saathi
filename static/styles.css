@@ -69,6 +69,8 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: v
 .now.empty .tuk { color: var(--muted); }
 .tuk { font-family: var(--gurmukhi); font-size: 40px; line-height: 1.5; font-weight: 600; }
 .meta { color: var(--muted); margin-top: 8px; }
+.next { font-family: var(--gurmukhi); font-size: 22px; color: var(--muted); margin-top: 6px; }
+.next:empty { display: none; }
 .v-major { color: var(--accent); }
 .v-minor { color: #d8c3a5; }
 

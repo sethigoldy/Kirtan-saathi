@@ -191,9 +191,21 @@ export class RepeatAligner {
    * Returns the best score, the query span, and the reference span of the
    * final segment (`rStart`..`rEnd`; `rEnd` is where the path ends).
    */
-  align(q: ArrayLike<number>, r: ArrayLike<number>, restart: ArrayLike<number>, rFrom = 0, rTo = r.length): LocalAlignment {
+  align(
+    q: ArrayLike<number>,
+    r: ArrayLike<number>,
+    restart: ArrayLike<number>,
+    rFrom = 0,
+    rTo = r.length,
+    /** If given, endBest[j] receives the best score of a path ending at reference
+     *  position j within the last `endRows` query positions (the most recent audio). */
+    endBest?: Float32Array,
+    endRows = 6,
+  ): LocalAlignment {
     const n = rTo - rFrom;
     this.ensure(n);
+    if (endBest) endBest.fill(0, 0, n);
+    const recordFrom = q.length - endRows;
     const { sub, gap } = this.table;
     let prev = this.vPrev, prevQ = this.qsPrev, prevR = this.rsPrev;
     let cur = this.v, curQ = this.qs, curR = this.rs;
@@ -227,6 +239,7 @@ export class RepeatAligner {
         cur[j] = v; curQ[j] = vq; curR[j] = vr;
         if (v > rowBest) { rowBest = v; rowBestQ = vq; }
         if (v > best) { best = v; bqS = vq; bqE = i; brS = vr; brE = j; }
+        if (endBest && i > recordFrom && v > endBest[j - 1]) endBest[j - 1] = v;
       }
       rowBestPrev = rowBest;
       rowBestPrevQ = rowBestQ;

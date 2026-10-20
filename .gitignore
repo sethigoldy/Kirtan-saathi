@@ -6,3 +6,5 @@ assets/
 bench-out/
 *.log
 smoke.png
+.bench-data/
+bench-results/

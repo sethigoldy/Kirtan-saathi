@@ -15,6 +15,7 @@ import { SAMPLE_RATE } from './asr';
 import type { Corpus } from './corpus';
 import type { LineHit, Retriever } from './retrieval';
 import { LineTracker, type TrackerOptions } from './tracker';
+import { PaathFollower, baniStream, sourceStream, type LineStream, type PaathOptions } from './paath';
 
 export interface Transcriber {
   /** `startSample` is the window's first sample in stream time. */
@@ -22,6 +23,9 @@ export interface Transcriber {
 }
 
 export type EngineState = 'listening' | 'searching' | 'locked';
+
+import type { EngineMode } from './mode';
+export type { EngineMode };
 
 export interface Candidate {
   shabad: number;
@@ -41,6 +45,9 @@ export interface EngineEvent {
   confidence: number;
   candidates: Candidate[];
   reason: string;
+  mode: EngineMode['kind'];
+  /** Name of the stream being followed in paath / bani mode. */
+  stream: string | null;
   asrText: string;
   windowSec: number;
   inferMs: number;
@@ -110,6 +117,13 @@ export interface EngineOptions {
   /** Multiplies hop lengths; raised by the pacer on slow machines. */
   paceScale: number;
   tracker: Partial<TrackerOptions>;
+  // Paath and bani modes.
+  paathWindowSec: number;
+  paathHopSec: number;
+  baniSearchWindowSec: number;
+  /** Fraction of a window a bani position must explain to start following. */
+  baniLockScore: number;
+  paath: Partial<PaathOptions>;
 }
 
 export const DEFAULT_ENGINE_OPTIONS: EngineOptions = {
@@ -150,6 +164,11 @@ export const DEFAULT_ENGINE_OPTIONS: EngineOptions = {
   lostMinSelf: 8,
   paceScale: 1,
   tracker: {},
+  paathWindowSec: 4,
+  paathHopSec: 0.5,
+  baniSearchWindowSec: 8,
+  baniLockScore: 0.6,
+  paath: {},
 };
 
 interface Evidence {
@@ -177,6 +196,8 @@ export class Engine {
   private paired = new Map<number, { t: number; d: number; line: number }[]>();
   private lastGlobalTop = 1;
   private manual = false;
+  private mode: EngineMode = { kind: 'kirtan' };
+  private follower: PaathFollower | null = null;
 
   constructor(
     readonly corpus: Corpus,
@@ -184,7 +205,12 @@ export class Engine {
     readonly asr: Transcriber,
     opts: Partial<EngineOptions> = {},
   ) {
-    this.opts = { ...DEFAULT_ENGINE_OPTIONS, ...opts, tracker: { ...DEFAULT_ENGINE_OPTIONS.tracker, ...opts.tracker } };
+    this.opts = {
+      ...DEFAULT_ENGINE_OPTIONS,
+      ...opts,
+      tracker: { ...DEFAULT_ENGINE_OPTIONS.tracker, ...opts.tracker },
+      paath: { ...DEFAULT_ENGINE_OPTIONS.paath, ...opts.paath },
+    };
     this.capacity = Math.ceil(Math.max(this.opts.searchWindowSec, this.opts.followWindowSec) * SAMPLE_RATE) + SAMPLE_RATE * 4;
     this.ring = new Float32Array(this.capacity);
     this.nextAt = Math.round(this.opts.minSearchAudioSec * SAMPLE_RATE);
@@ -200,7 +226,48 @@ export class Engine {
   }
 
   get lockedShabad(): number | null {
+    return this.currentShabad();
+  }
+
+  get currentMode(): EngineMode {
+    return this.mode;
+  }
+
+  /** Switch mode; clears any lock and starts searching again. */
+  setMode(mode: EngineMode): void {
+    if (mode.kind === 'bani') baniStream(this.corpus, mode.id); // validates the id
+    this.mode = mode;
+    this.reset();
+  }
+
+  private currentLine(): number | null {
+    if (this.follower) return this.follower.line;
+    return this.tracker?.displayedLine ?? null;
+  }
+
+  private currentShabad(): number | null {
+    if (this.follower) return this.corpus.shabadOf[this.follower.line];
     return this.tracker?.shabad ?? null;
+  }
+
+  /** Stream to follow in paath / bani mode, positioned at `line`. */
+  private streamFor(line: number): { stream: LineStream; index: number } {
+    if (this.mode.kind === 'bani') {
+      const stream = baniStream(this.corpus, this.mode.id);
+      const index = stream.lines.indexOf(line);
+      if (index >= 0) return { stream, index };
+    }
+    const stream = sourceStream(this.corpus, line);
+    return { stream, index: line - stream.lines[0] };
+  }
+
+  private startFollower(stream: LineStream, index: number, asr?: AsrResult): void {
+    this.tracker = null;
+    this.follower = new PaathFollower(this.corpus, this.retriever, stream, index, this.opts.paath);
+    if (asr) this.follower.update(this.keySince(asr, this.opts.paathWindowSec));
+    this.state = 'locked';
+    this.recentEmission = [];
+    this.paired.clear();
   }
 
   pushAudio(chunk: Float32Array): void {
@@ -240,21 +307,30 @@ export class Engine {
 
   /** Operator: lock to a shabad (optionally a line). */
   lock(shabad: number, line: number | null = null): void {
+    this.manual = true;
+    if (this.mode.kind !== 'kirtan') {
+      const start = line ?? this.corpus.shabads[shabad].start;
+      const { stream, index } = this.streamFor(start);
+      this.startFollower(stream, index);
+      return;
+    }
+    this.follower = null;
     this.tracker = new LineTracker(this.corpus, this.retriever, shabad, line, this.opts.tracker);
     if (line !== null) this.tracker.force(line);
     this.state = 'locked';
-    this.manual = true;
     this.recentEmission = [];
   }
 
   /** Operator: move the display to a line in the locked shabad. */
   setLine(line: number): void {
-    this.tracker?.force(line);
+    if (this.follower) this.follower.force(line);
+    else this.tracker?.force(line);
   }
 
   /** Operator or auto: clear lock and evidence, start searching again. */
   reset(): void {
     this.tracker = null;
+    this.follower = null;
     this.manual = false;
     this.evidence.clear();
     this.recentEmission = [];
@@ -343,6 +419,12 @@ export class Engine {
   }
 
   private startTracking(shabad: number, line: number | null, asr?: AsrResult): void {
+    if (this.mode.kind !== 'kirtan' && line !== null) {
+      const { stream, index } = this.streamFor(line);
+      this.startFollower(stream, index, asr);
+      return;
+    }
+    this.follower = null;
     const recent = asr ? this.recentLine(asr, shabad) : null;
     this.tracker = new LineTracker(this.corpus, this.retriever, shabad, recent ?? line, this.opts.tracker);
     this.state = 'locked';
@@ -378,16 +460,18 @@ export class Engine {
   }
 
   private event(asr: AsrResult, t: number, reason: string, confidence: number): EngineEvent {
-    const line = this.tracker?.displayedLine ?? null;
+    const line = this.currentLine();
     return {
       t,
       state: this.state,
-      shabad: this.tracker?.shabad ?? null,
+      shabad: this.currentShabad(),
       line,
       lineInShabad: line === null ? null : this.corpus.lineInShabad[line],
       confidence,
       candidates: this.candidates(t),
       reason,
+      mode: this.mode.kind,
+      stream: this.follower?.stream.name ?? null,
       asrText: asr.text,
       windowSec: asr.windowSec,
       inferMs: asr.inferMs,
@@ -400,6 +484,20 @@ export class Engine {
     const o = this.opts;
     if (this.state === 'listening') this.state = 'searching';
     const t = this.now;
+
+    if (this.state === 'searching' && this.mode.kind === 'bani') {
+      // Bani mode: locate the position directly within the bani.
+      const stream = baniStream(this.corpus, this.mode.id);
+      const { samples, start } = this.window(o.baniSearchWindowSec);
+      const asr = await this.asr.transcribe(samples, start);
+      this.nextAt = this.total + Math.round(o.searchHopSec * o.paceScale * SAMPLE_RATE);
+      const loc = PaathFollower.locate(this.retriever, stream, asr.key);
+      if (loc.index >= 0 && loc.score >= o.baniLockScore) {
+        this.startFollower(stream, loc.index, asr);
+        return this.event(asr, t, 'lock-bani', loc.score);
+      }
+      return this.event(asr, t, 'search', loc.score);
+    }
 
     if (this.state === 'searching') {
       const { samples, start } = this.window(o.searchWindowSec);
@@ -437,7 +535,22 @@ export class Engine {
       return this.event(asr, t, 'search', best?.score ?? 0);
     }
 
-    // Locked.
+    if (this.follower) {
+      const follower = this.follower;
+      const { samples, start } = this.window(o.paathWindowSec);
+      const asr = await this.asr.transcribe(samples, start);
+      this.nextAt = this.total + Math.round(o.paathHopSec * o.paceScale * SAMPLE_RATE);
+      const upd = follower.update(asr.key);
+      if (upd.lost && !this.manual) {
+        this.follower = null;
+        this.state = 'searching';
+        this.evidence.clear();
+        return this.event(asr, t, 'unlock', upd.score);
+      }
+      return this.event(asr, t, upd.held ? 'hold' : 'follow', upd.score);
+    }
+
+    // Locked (kirtan).
     const tracker = this.tracker!;
     const global = t - this.lastGlobal >= o.globalCheckSec * o.paceScale;
     const { samples, start } = this.window(global ? Math.max(o.globalWindowSec, o.followWindowSec) : o.followWindowSec);
