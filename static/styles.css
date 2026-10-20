@@ -137,7 +137,7 @@ kbd {
 
 /* ---------- Stage ---------- */
 main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0; }
-.stage { padding: 18px 28px 28px; overflow: auto; min-height: 0; }
+.stage { padding: 18px 28px 0; overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
 
 .status-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .status { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
@@ -152,7 +152,12 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0
 .now-meta b { color: var(--ink); font-weight: 600; }
 .status-actions { margin-left: auto; display: flex; gap: 4px; flex: none; }
 
-.screen { display: grid; grid-template-columns: minmax(0, 640px) auto; gap: 18px; align-items: end; }
+.screen {
+  display: grid;
+  /* the preview never takes more than ~44% of the window height */
+  grid-template-columns: minmax(0, min(640px, calc(44vh * 16 / 9))) auto;
+  gap: 18px; align-items: end; flex: none;
+}
 .preview { margin: 0; }
 .preview-wrap {
   position: relative;
@@ -180,7 +185,7 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0
 #blank.on kbd { color: #fff; border-color: rgba(255, 255, 255, 0.5); background: transparent; }
 
 /* Getting started: a real sequence, so numbered. */
-.guide { list-style: none; counter-reset: step; margin: 26px 0 0; padding: 0; max-width: 640px; display: grid; gap: 10px; }
+.guide { list-style: none; counter-reset: step; margin: 22px 0 0; padding: 0 0 24px; max-width: 640px; display: grid; gap: 10px; overflow-y: auto; min-height: 0; }
 .guide li {
   counter-increment: step; position: relative; padding: 12px 14px 12px 52px;
   background: var(--surmai-2); border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted);
@@ -193,7 +198,10 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0
 .guide[hidden] { display: none; }
 
 /* The shabad, like a pothi column: click a line to show it. */
-.lines { list-style: none; margin: 26px 0 0; padding: 0; max-width: 900px; }
+.lines {
+  list-style: none; margin: 18px -8px 0; padding: 0 8px 24px; max-width: 916px;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; position: relative;
+}
 .lines li {
   font-size: 21px; line-height: 1.55; padding: 8px 14px 8px 18px; border-radius: var(--r-sm); cursor: pointer; position: relative;
 }
@@ -290,10 +298,10 @@ input[type='range'] { padding: 0; border: 0; background: transparent; accent-col
 
 @media (max-width: 1100px) {
   main { grid-template-columns: minmax(0, 1fr) 320px; }
-  .screen { grid-template-columns: 1fr; }
+  .screen { grid-template-columns: minmax(0, min(100%, calc(40vh * 16 / 9))); }
   .steer { flex-direction: row; padding-bottom: 0; }
   .steer button { min-width: 0; }
-  .input-pick select { max-width: 150px; }
+  .input-pick select { max-width: 180px; }
 }
 
 /* Visually hidden native inputs behind the custom swatches, segments and switches. */

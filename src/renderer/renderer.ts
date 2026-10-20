@@ -106,7 +106,10 @@ function highlight(): void {
   for (const li of Array.from(list.children) as HTMLElement[]) {
     const on = currentLine !== null && li.dataset.line === String(currentLine);
     li.classList.toggle('current', on);
-    if (on) li.scrollIntoView({ block: 'nearest' });
+    // Scroll only the shabad list, so the live preview above stays in view.
+    if (on && (li.offsetTop < list.scrollTop || li.offsetTop + li.offsetHeight > list.scrollTop + list.clientHeight)) {
+      list.scrollTo({ top: li.offsetTop - list.clientHeight / 3, behavior: 'smooth' });
+    }
   }
   const s = shabad;
   const meta = $('now-meta');
