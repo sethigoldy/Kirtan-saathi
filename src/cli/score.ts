@@ -12,7 +12,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
-export interface GtSegment { start: number; end: number; line_idx: number; shabad_id?: number; verse_id?: number; banidb_gurmukhi?: string }
+export interface GtSegment { start: number; end: number; line_idx: number; shabad_id?: number; verse_id?: number; banidb_gurmukhi?: string; line_id?: string }
 export interface GtCase {
   video_id: string;
   shabad_id?: number;
@@ -20,6 +20,8 @@ export interface GtCase {
   uem?: { start: number; end: number };
   segments: GtSegment[];
   lines?: { line_idx: number; text: string; shabad_id?: number }[];
+  /** 'corpus': line_idx values are global corpus line indices (caption labels). */
+  line_space?: 'corpus';
 }
 export interface PredSegment { start: number; end: number; line_idx?: number | null; shabad_id?: number; verse_id?: number; banidb_gurmukhi?: string }
 export interface PredCase { video_id?: string; shabad_id?: number; segments: PredSegment[] }

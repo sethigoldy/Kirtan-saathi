@@ -75,8 +75,33 @@ jobs:
           key: asr-${{ hashFiles('models/model.int8.onnx') }}-${{ github.run_id }}
           restore-keys: asr-${{ hashFiles('models/model.int8.onnx') }}-
 
+      # Darbar Sahib recordings (used with SGPC's permission) live in a private
+      # repository. They go to the job's temp directory, never to .bench-data
+      # or the decode cache (caches can be restored by fork pull requests).
+      # Without the secret (forks, other clones) this set is skipped.
+      - name: Fetch private Darbar Sahib test set
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          if [ -z "$DATA_REPO_TOKEN" ]; then
+            echo "DATA_REPO_TOKEN is not available: skipping the private set"
+            exit 0
+          fi
+          git clone --depth 1 --quiet "https://x-access-token:${DATA_REPO_TOKEN}@github.com/sethigoldy/kirtan-saathi-data.git" "$RUNNER_TEMP/data"
+          mkdir -p "$RUNNER_TEMP/darbar/gt" "$RUNNER_TEMP/darbar/audio"
+          shopt -s nullglob
+          n=0
+          for j in "$RUNNER_TEMP"/data/test/*.json; do
+            id=$(basename "$j" .json)
+            cp "$j" "$RUNNER_TEMP/darbar/gt/"
+            ffmpeg -v error -y -i "$RUNNER_TEMP/data/test/$id.opus" -ac 1 -ar 16000 "$RUNNER_TEMP/darbar/audio/${id}_16k.wav"
+            n=$((n + 1))
+          done
+          rm -rf "$RUNNER_TEMP/data"
+          echo "Private set: $n recordings"
+
       - name: Run benchmark
-        run: node dist/cli/ci-bench.js --data .bench-data --out bench-results
+        run: node dist/cli/ci-bench.js --data .bench-data --out bench-results --private "$RUNNER_TEMP/darbar"
 
       - name: Save decode cache
         if: always()

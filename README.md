@@ -238,6 +238,10 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 | `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
 | `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
 
+### Darbar Sahib recordings (private)
+
+Darbar Sahib kirtan broadcasts show the Gurbani line on screen, and the caption labeller turns them into labelled test and training data. The recordings are used with SGPC's permission and stay in the private `kirtan-saathi-data` repository. The benchmark adds them as a private set when the `DATA_REPO_TOKEN` secret is present, and reports only aggregate numbers. See [docs/darbar-sahib-data.md](docs/darbar-sahib-data.md).
+
 ### Releasing a version
 
 1. Set `"version"` in `package.json` (semantic versioning: `0.1.1` fixes, `0.2.0` features) and merge to `main`.
@@ -281,7 +285,7 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | `src/present/`, `static/present/` | Projector / overlay / phone page, Gurmukhi formatting and Devanagari transliteration |
 | `src/renderer/`, `static/` | Operator window, audio capture worklet, styles |
 | `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon, macOS entitlements |
-| `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score` |
+| `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score`, `caption-label`, `caption-pack`, `caption-eval` |
 | `src/test/` | Unit tests (`npm test`) |
 | `scripts/` | Asset and evaluation-data fetchers |
 | `ci/` | Benchmark thresholds and baseline |

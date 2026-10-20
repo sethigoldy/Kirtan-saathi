@@ -2,5 +2,7 @@
   "kirtanFrameAccuracyMin": 87.0,
   "kirtanWrongShabadSecMax": 0,
   "paathWithin1Min": 95.0,
-  "paathLagMedianMax": 1.0
+  "paathLagMedianMax": 1.0,
+  "darbarFrameAccuracyMin": null,
+  "darbarWrongShabadSecMax": null
 }

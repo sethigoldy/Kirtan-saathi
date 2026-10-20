@@ -3,14 +3,21 @@
  * with ci/baseline.json and gated by ci/thresholds.json.
  *
  * Usage: node dist/cli/ci-bench.js --data .bench-data --out bench-results [--cache .cache/asr]
+ *        [--private .bench-data/darbar]
+ *
+ * --private: caption-labelled Darbar Sahib recordings from the private data
+ * repository (gt/*.json + audio/<id>_16k.wav). Only aggregate numbers are
+ * printed or written; their decodes go to a temporary directory, never the
+ * shared cache.
  * Writes <out>/results.json and <out>/summary.md; exits 1 if a gate fails.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { AsrModel } from '../engine/asr';
 import { Corpus } from '../engine/corpus';
 import { Retriever } from '../engine/retrieval';
-import { runCase } from './bench';
+import { normalizeGt, runCase } from './bench';
 import { evaluatePaath, type PaathMetrics } from './paath-eval';
 import { scoreCase, type GtCase } from './score';
 
@@ -28,6 +35,8 @@ interface Results {
     cases: { id: string; accuracy: number; firstCorrectLockSec: number | null; wrongShabadSec: number }[];
   };
   paath: PaathMetrics[];
+  /** Private caption-labelled set (aggregate only). */
+  darbar?: { recordings: number; minutes: number; frameAccuracy: number; wrongShabadSec: number; medianFirstLockSec: number };
 }
 
 interface Thresholds {
@@ -35,6 +44,9 @@ interface Thresholds {
   kirtanWrongShabadSecMax: number;
   paathWithin1Min: number;
   paathLagMedianMax: number;
+  /** null: report the private set without gating it (until it has a baseline). */
+  darbarFrameAccuracyMin?: number | null;
+  darbarWrongShabadSecMax?: number | null;
 }
 
 const PAATH_RUNS: { name: string; mode: string }[] = [
@@ -90,6 +102,38 @@ async function main(): Promise<void> {
     console.log(`paath ${r.name} [${r.mode}]: within-1 ${m.within1}%, lag ${m.lagMedian} s`);
   }
 
+  // Private Darbar Sahib set: aggregate only, no shared cache.
+  let darbar: Results['darbar'];
+  const privDir = resolve(arg('private', join(data, 'darbar')));
+  if (existsSync(join(privDir, 'gt'))) {
+    const tmpCache = mkdtempSync(join(tmpdir(), 'ks-private-asr-'));
+    let pc = 0, pt = 0, pw = 0, seconds = 0;
+    const plocks: number[] = [];
+    const files = readdirSync(join(privDir, 'gt')).filter((x) => x.endsWith('.json')).sort();
+    for (const f of files) {
+      const gt = normalizeGt(corpus, JSON.parse(readFileSync(join(privDir, 'gt', f), 'utf8')) as GtCase);
+      const run = await runCase(corpus, retriever, model, gt, f.replace(/\.json$/, ''), join(privDir, 'audio'), tmpCache, {}, false);
+      const sc = scoreCase(gt, { segments: run.segments });
+      pc += sc.correct;
+      pt += sc.total;
+      pw += run.wrongShabadSec;
+      seconds += gt.total_duration;
+      plocks.push(run.firstCorrectLockSec ?? 999);
+    }
+    rmSync(tmpCache, { recursive: true, force: true });
+    plocks.sort((a, b) => a - b);
+    if (files.length) {
+      darbar = {
+        recordings: files.length,
+        minutes: Math.round(seconds / 6) / 10,
+        frameAccuracy: Math.round((10000 * pc) / Math.max(1, pt)) / 100,
+        wrongShabadSec: Math.round(pw),
+        medianFirstLockSec: plocks[plocks.length >> 1],
+      };
+      console.log(`darbar (private, ${darbar.recordings} recordings, ${darbar.minutes} min): ${darbar.frameAccuracy}%`);
+    }
+  }
+
   const results: Results = {
     commit: process.env.GITHUB_SHA ?? 'local',
     kirtan: {
@@ -99,6 +143,7 @@ async function main(): Promise<void> {
       cases,
     },
     paath,
+    ...(darbar ? { darbar } : {}),
   };
   writeFileSync(join(out, 'results.json'), JSON.stringify(results, null, 2));
 
@@ -109,6 +154,12 @@ async function main(): Promise<void> {
   }
   if (results.kirtan.wrongShabadSec > thresholds.kirtanWrongShabadSecMax) {
     failures.push(`kirtan wrong-shabad time ${results.kirtan.wrongShabadSec} s > ${thresholds.kirtanWrongShabadSecMax} s`);
+  }
+  if (darbar && typeof thresholds.darbarFrameAccuracyMin === 'number' && darbar.frameAccuracy < thresholds.darbarFrameAccuracyMin) {
+    failures.push(`Darbar Sahib frame accuracy ${darbar.frameAccuracy}% < ${thresholds.darbarFrameAccuracyMin}%`);
+  }
+  if (darbar && typeof thresholds.darbarWrongShabadSecMax === 'number' && darbar.wrongShabadSec > thresholds.darbarWrongShabadSecMax) {
+    failures.push(`Darbar Sahib wrong-shabad time ${darbar.wrongShabadSec} s > ${thresholds.darbarWrongShabadSecMax} s`);
   }
   for (const m of paath) {
     if (m.within1 < thresholds.paathWithin1Min) failures.push(`paath ${m.name} within-1 ${m.within1}% < ${thresholds.paathWithin1Min}%`);
@@ -136,6 +187,16 @@ async function main(): Promise<void> {
     );
   }
   md.push('');
+  if (darbar) {
+    const bd = b?.darbar;
+    const gate = (v: number | null | undefined, unit: string, op: string) => (typeof v === 'number' ? `${op} ${v}${unit}` : 'report only');
+    md.push(`| Darbar Sahib kirtan (private, ${darbar.recordings} recordings, ${darbar.minutes} min) | Result | Gate |`);
+    md.push('|---|---|---|');
+    md.push(`| Frame accuracy | **${darbar.frameAccuracy}%**${delta(darbar.frameAccuracy, bd?.frameAccuracy)} | ${gate(thresholds.darbarFrameAccuracyMin, '%', '≥')} |`);
+    md.push(`| Time on a wrong shabad | ${darbar.wrongShabadSec} s${delta(darbar.wrongShabadSec, bd?.wrongShabadSec, 0, false)} | ${gate(thresholds.darbarWrongShabadSecMax, ' s', '≤')} |`);
+    md.push(`| Median first correct lock | ${darbar.medianFirstLockSec} s${delta(darbar.medianFirstLockSec, bd?.medianFirstLockSec, 0, false)} | — |`);
+    md.push('');
+  }
   md.push('<details><summary>Kirtan cases</summary>');
   md.push('');
   md.push('| Case | Accuracy | First correct lock | Wrong shabad |');
