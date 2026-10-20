@@ -87,7 +87,17 @@ jobs:
             echo "DATA_REPO_TOKEN is not available: skipping the private set"
             exit 0
           fi
-          git clone --depth 1 --quiet "https://x-access-token:${DATA_REPO_TOKEN}@github.com/sethigoldy/kirtan-saathi-data.git" "$RUNNER_TEMP/data"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $DATA_REPO_TOKEN" https://api.github.com/repos/sethigoldy/kirtan-saathi-data)
+          if [ "$code" != 200 ]; then
+            echo "::warning::DATA_REPO_TOKEN cannot read sethigoldy/kirtan-saathi-data (HTTP $code). Give the token read-only Contents access to that repository. Skipping the private set."
+            exit 0
+          fi
+          # Clone from outside the checkout and clear the auth header that
+          # actions/checkout stores for this repository's own GITHUB_TOKEN;
+          # otherwise git sends that token instead of DATA_REPO_TOKEN.
+          cd "$RUNNER_TEMP"
+          git -c http.https://github.com/.extraheader= clone --depth 1 --quiet "https://x-access-token:${DATA_REPO_TOKEN}@github.com/sethigoldy/kirtan-saathi-data.git" "$RUNNER_TEMP/data"
+          cd "$GITHUB_WORKSPACE"
           mkdir -p "$RUNNER_TEMP/darbar/gt" "$RUNNER_TEMP/darbar/audio"
           shopt -s nullglob
           n=0
