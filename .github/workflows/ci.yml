@@ -53,3 +53,42 @@ jobs:
 
       - name: Model smoke test (ONNX Runtime native binary on this platform)
         run: node dist/cli/model-smoke.js
+
+  captions:
+    name: Caption labeller (synthetic broadcast)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      npm_config_onnxruntime_node_install: skip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Tools (ffmpeg, Tesseract with the Gurmukhi model, Pillow)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr
+          mkdir -p "$RUNNER_TEMP/tessdata"
+          curl -sSfL -o "$RUNNER_TEMP/tessdata/pan.traineddata" https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/pan.traineddata
+          pip install --quiet pillow fonttools brotli
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      # A 50 s broadcast-style video from the Japji fixture: Gurbani caption and
+      # Punjabi arth on a translucent band over a moving background, with
+      # random operator lag. The labeller must recover the captions.
+      - name: Label a synthetic captioned broadcast
+        env:
+          TESSDATA_PREFIX: ${{ runner.temp }}/tessdata
+        run: |
+          python3 scripts/make-caption-video.py test/fixtures/japji-50s.timeline.json test/fixtures/japji-50s.wav "$RUNNER_TEMP/cap/japji.mp4" --style translucent --font anek --seconds 50
+          node dist/cli/caption-label.js "$RUNNER_TEMP/cap/japji.mp4" --out "$RUNNER_TEMP/cap/out"
+          node dist/cli/caption-eval.js "$RUNNER_TEMP/cap/out/japji/japji.json" "$RUNNER_TEMP/cap/japji.truth.json" --min-recall 0.9

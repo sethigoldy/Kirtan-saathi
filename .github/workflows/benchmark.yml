@@ -75,8 +75,43 @@ jobs:
           key: asr-${{ hashFiles('models/model.int8.onnx') }}-${{ github.run_id }}
           restore-keys: asr-${{ hashFiles('models/model.int8.onnx') }}-
 
+      # Darbar Sahib recordings (used with SGPC's permission) live in a private
+      # repository. They go to the job's temp directory, never to .bench-data
+      # or the decode cache (caches can be restored by fork pull requests).
+      # Without the secret (forks, other clones) this set is skipped.
+      - name: Fetch private Darbar Sahib test set
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          if [ -z "$DATA_REPO_TOKEN" ]; then
+            echo "DATA_REPO_TOKEN is not available: skipping the private set"
+            exit 0
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $DATA_REPO_TOKEN" https://api.github.com/repos/sethigoldy/kirtan-saathi-data)
+          if [ "$code" != 200 ]; then
+            echo "::warning::DATA_REPO_TOKEN cannot read sethigoldy/kirtan-saathi-data (HTTP $code). Give the token read-only Contents access to that repository. Skipping the private set."
+            exit 0
+          fi
+          # Clone from outside the checkout and clear the auth header that
+          # actions/checkout stores for this repository's own GITHUB_TOKEN;
+          # otherwise git sends that token instead of DATA_REPO_TOKEN.
+          cd "$RUNNER_TEMP"
+          git -c http.https://github.com/.extraheader= clone --depth 1 --quiet "https://x-access-token:${DATA_REPO_TOKEN}@github.com/sethigoldy/kirtan-saathi-data.git" "$RUNNER_TEMP/data"
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p "$RUNNER_TEMP/darbar/gt" "$RUNNER_TEMP/darbar/audio"
+          shopt -s nullglob
+          n=0
+          for j in "$RUNNER_TEMP"/data/test/*.json; do
+            id=$(basename "$j" .json)
+            cp "$j" "$RUNNER_TEMP/darbar/gt/"
+            ffmpeg -v error -y -i "$RUNNER_TEMP/data/test/$id.opus" -ac 1 -ar 16000 "$RUNNER_TEMP/darbar/audio/${id}_16k.wav"
+            n=$((n + 1))
+          done
+          rm -rf "$RUNNER_TEMP/data"
+          echo "Private set: $n recordings"
+
       - name: Run benchmark
-        run: node dist/cli/ci-bench.js --data .bench-data --out bench-results
+        run: node dist/cli/ci-bench.js --data .bench-data --out bench-results --private "$RUNNER_TEMP/darbar"
 
       - name: Save decode cache
         if: always()

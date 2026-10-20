@@ -28,6 +28,23 @@ function arg(name: string, def?: string): string | undefined {
 }
 const flag = (name: string) => process.argv.includes(`--${name}`);
 
+/**
+ * Ground truth in corpus line space (labels from caption-label): segments
+ * name corpus lines by Shabad OS line id and may span many shabads. Line ids
+ * are mapped to the current corpus index; headings are dropped (the app never
+ * shows them while following), leaving gaps the scorer treats leniently.
+ */
+export function normalizeGt(corpus: Corpus, gt: GtCase): GtCase {
+  if (gt.line_space !== 'corpus') return gt;
+  const index = new Map(corpus.lineId.map((id, i) => [id, i]));
+  const segments = gt.segments
+    .map((s) => ({ start: s.start, end: s.end, line_idx: s.line_id ? index.get(s.line_id) ?? -1 : -1 }))
+    .filter((s) => s.line_idx >= 0 && corpus.isSingable(s.line_idx));
+  return { ...gt, segments, lines: undefined, shabad_id: undefined };
+}
+
+const isCorpusSpace = (gt: GtCase) => gt.line_space === 'corpus';
+
 /** Map our shabad index to the GT shabad id when their texts are identical. */
 function gtShabadFor(corpus: Corpus, shabad: number, gt: GtCase): number | null {
   if (!gt.lines?.length) return null;
@@ -78,8 +95,11 @@ export async function runCase(
   }
   asr.save();
 
+  const corpusSpace = isCorpusSpace(gt);
+  const gtShabads = new Set(corpusSpace ? gt.segments.map((g) => corpus.shabadOf[g.line_idx]) : []);
   const gtShabadCache = new Map<number, number | null>();
   const resolveShabad = (s: number) => {
+    if (corpusSpace) return gtShabads.has(s) ? s : null;
     if (!gtShabadCache.has(s)) gtShabadCache.set(s, gtShabadFor(corpus, s, gt));
     return gtShabadCache.get(s)!;
   };
@@ -95,12 +115,16 @@ export async function runCase(
   const close = (t: number) => {
     if (cur && cur.shabad !== null && cur.line !== null && t > cur.start) {
       const gid = resolveShabad(cur.shabad);
-      segments.push({
-        start: Math.round(cur.start * 100) / 100,
-        end: Math.round(t * 100) / 100,
-        shabad_id: gid ?? -1 - cur.shabad,
-        line_idx: corpus.lineInShabad[cur.line],
-      });
+      segments.push(
+        corpusSpace
+          ? { start: Math.round(cur.start * 100) / 100, end: Math.round(t * 100) / 100, line_idx: cur.line }
+          : {
+              start: Math.round(cur.start * 100) / 100,
+              end: Math.round(t * 100) / 100,
+              shabad_id: gid ?? -1 - cur.shabad,
+              line_idx: corpus.lineInShabad[cur.line],
+            },
+      );
       if (gid === null) wrongShabadSec += t - cur.start;
     }
   };
@@ -157,7 +181,7 @@ async function main(): Promise<void> {
   for (const f of readdirSync(gtDir).filter((x) => x.endsWith('.json')).sort()) {
     const id = f.replace(/\.json$/, '');
     if (only && !id.startsWith(only)) continue;
-    const gt = JSON.parse(readFileSync(join(gtDir, f), 'utf8')) as GtCase;
+    const gt = normalizeGt(corpus, JSON.parse(readFileSync(join(gtDir, f), 'utf8')) as GtCase);
     const run = await runCase(corpus, retriever, model, gt, id, audioDir, cacheDir, opts, latency);
     runs.push(run);
     writeFileSync(join(outDir, f), JSON.stringify({ video_id: gt.video_id, segments: run.segments }, null, 1));
