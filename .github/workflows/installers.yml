@@ -1,0 +1,257 @@
+name: Installers
+
+# Builds the installers people download: a Windows setup wizard, macOS disk
+# images for Apple Silicon and Intel, and Linux packages. Each installer is
+# installed on a clean CI machine of its own OS and the installed app is run
+# against a recorded Japji Sahib paath before anything is published.
+#
+#   Push a tag v1.2.3 (matching package.json) -> GitHub Release with the installers
+#   Run manually ("Run workflow")              -> installers as workflow artifacts;
+#                                                 tick "prerelease" to also publish a test release
+#   Pull requests touching packaging           -> build and install-test only
+#
+# Optional signing secrets (without them the apps are unsigned, and the
+# release notes explain the one-time "Run anyway" / "Open Anyway" steps):
+#   macOS:   MAC_CSC_LINK (base64 .p12 Developer ID Application), MAC_CSC_KEY_PASSWORD,
+#            APPLE_API_KEY (contents of the .p8), APPLE_API_KEY_ID, APPLE_API_ISSUER
+#   Windows: WIN_CSC_LINK (base64 .pfx), WIN_CSC_KEY_PASSWORD
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - electron-builder.yml
+      - build/**
+      - scripts/after-pack.cjs
+      - scripts/check-smoke.mjs
+      - scripts/fetch-assets.mjs
+      - package.json
+      - package-lock.json
+      - src/main/**
+      - .github/workflows/installers.yml
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: Also publish these installers as a test release (pre-release)
+        type: boolean
+        default: false
+
+concurrency:
+  group: installers-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: Windows, os: windows-latest, target: --win --x64, mac: '' }
+          - { label: Mac (Apple Silicon), os: macos-15, target: --mac --arm64, mac: Apple-Silicon }
+          - { label: Mac (Intel), os: macos-15-intel, target: --mac --x64, mac: Intel }
+          - { label: Linux, os: ubuntu-24.04, target: --linux --x64, mac: '' }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      npm_config_onnxruntime_node_install: skip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version. Update package.json or re-tag."
+            exit 1
+          fi
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Cache acoustic model
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: model-karansea-int8-5fd2e89e
+
+      - name: Fetch acoustic model (pinned revision, checksum verified)
+        run: npm run fetch-assets -- --model-only
+
+      - name: Package
+        shell: bash
+        env:
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          MAC_FLAVOUR: ${{ matrix.mac }}
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            # People choose by chip name, not by CPU architecture.
+            extra+=("-c.dmg.artifactName=Kirtan-Saathi-\${version}-Mac-$MAC_FLAVOUR.\${ext}")
+            if [ -n "$MAC_CSC_LINK" ]; then
+              echo "Signing with the Developer ID certificate"
+              export CSC_LINK="$MAC_CSC_LINK" CSC_KEY_PASSWORD="$MAC_CSC_KEY_PASSWORD"
+              if [ -n "$APPLE_API_KEY_CONTENT" ]; then
+                printf '%s' "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/apple-api-key.p8"
+                export APPLE_API_KEY="$RUNNER_TEMP/apple-api-key.p8"
+                extra+=(-c.mac.notarize=true)
+              fi
+            else
+              # Ad-hoc signature: macOS then offers "Open Anyway" instead of
+              # reporting the app as damaged.
+              echo "No Apple certificate: ad-hoc signing"
+              export CSC_IDENTITY_AUTO_DISCOVERY=false
+              # electron-builder skips signing on pull-request builds by default;
+              # an unsigned arm64 app is reported as damaged, so sign PR builds too.
+              export CSC_FOR_PULL_REQUEST=true
+              # (Hardened runtime stays on: the entitlements include
+              # disable-library-validation, which ad-hoc signing needs.)
+              extra+=(-c.mac.identity=-)
+            fi
+          fi
+          if [ "$RUNNER_OS" = "Windows" ] && [ -n "$WIN_CSC_LINK" ]; then
+            echo "Signing with the Windows certificate"
+            export WIN_CSC_LINK WIN_CSC_KEY_PASSWORD
+          fi
+          npx electron-builder ${{ matrix.target }} --publish never "${extra[@]}"
+          ls -la release
+
+      # ---- Install the installer and run the installed app ----
+
+      - name: Install and run (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release -Filter 'Kirtan-Saathi-Setup-*.exe' | Select-Object -First 1
+          Write-Host "Installing $($setup.Name) silently"
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Kirtan Saathi.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Kirtan Saathi.exe not found after installation' }
+          Write-Host "Installed at $($exe.FullName)"
+          if (-not (Test-Path "$env:USERPROFILE\Desktop\Kirtan Saathi.lnk") -and -not (Test-Path "$env:PUBLIC\Desktop\Kirtan Saathi.lnk")) {
+            Write-Warning 'Desktop shortcut not found'
+          }
+          New-Item -ItemType Directory -Force smoke | Out-Null
+          $env:GURBANI_SMOKE = "$PWD\test\fixtures\japji-50s.wav"
+          $env:GURBANI_SMOKE_MODE = 'paath'
+          $env:GURBANI_SMOKE_SECONDS = '45'
+          $env:GURBANI_SMOKE_SHOT = "$PWD\smoke\operator.png"
+          $env:GURBANI_SMOKE_PROJECTOR = "$PWD\smoke\projector.png"
+          $env:GURBANI_SMOKE_REPORT = "$PWD\smoke\report.json"
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru -RedirectStandardOutput smoke\app.log -RedirectStandardError smoke\app.err
+          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'app did not finish within 3 minutes' }
+          Get-Content smoke\app.log -ErrorAction SilentlyContinue | Select-Object -Last 20
+          node scripts/check-smoke.mjs smoke/report.json smoke/operator.png smoke/projector.png
+
+      - name: Install and run (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          dmg=$(ls release/Kirtan-Saathi-*.dmg | head -1)
+          echo "Mounting $dmg"
+          hdiutil attach "$dmg" -nobrowse -mountpoint /Volumes/KirtanSaathi
+          cp -R "/Volumes/KirtanSaathi/Kirtan Saathi.app" /Applications/
+          hdiutil detach /Volumes/KirtanSaathi
+          app="/Applications/Kirtan Saathi.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -E 'Signature|Authority|TeamIdentifier' || true
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$app/Contents/Info.plist"
+          lipo -archs "$app/Contents/MacOS/Kirtan Saathi"
+          mkdir -p smoke
+          GURBANI_SMOKE="$PWD/test/fixtures/japji-50s.wav" GURBANI_SMOKE_MODE=paath GURBANI_SMOKE_SECONDS=45 \
+          GURBANI_SMOKE_SHOT="$PWD/smoke/operator.png" GURBANI_SMOKE_PROJECTOR="$PWD/smoke/projector.png" \
+          GURBANI_SMOKE_REPORT="$PWD/smoke/report.json" \
+            perl -e 'alarm shift; exec @ARGV' 180 "$app/Contents/MacOS/Kirtan Saathi" --disable-gpu > smoke/app.log 2>&1 || true
+          tail -20 smoke/app.log
+          node scripts/check-smoke.mjs smoke/report.json smoke/operator.png smoke/projector.png
+
+      - name: Install and run (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb
+          sudo apt-get install -y ./release/kirtan-saathi_*.deb
+          bin=$(dpkg -L kirtan-saathi | grep -E '/kirtan-saathi$' | grep '^/opt/' | head -1)
+          echo "Installed at $bin"
+          mkdir -p smoke
+          GURBANI_SMOKE="$PWD/test/fixtures/japji-50s.wav" GURBANI_SMOKE_MODE=paath GURBANI_SMOKE_SECONDS=45 \
+          GURBANI_SMOKE_SHOT="$PWD/smoke/operator.png" GURBANI_SMOKE_PROJECTOR="$PWD/smoke/projector.png" \
+          GURBANI_SMOKE_REPORT="$PWD/smoke/report.json" \
+            timeout 180 xvfb-run -a -s "-screen 0 1400x900x24" "$bin" --no-sandbox --disable-gpu > smoke/app.log 2>&1 || true
+          tail -20 smoke/app.log
+          node scripts/check-smoke.mjs smoke/report.json smoke/operator.png smoke/projector.png
+
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ matrix.os }}
+          path: smoke/
+          if-no-files-found: ignore
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.deb
+            release/*.AppImage
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.prerelease)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: dist-installers
+          merge-multiple: true
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          cd dist-installers
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"; title="Kirtan Saathi $version"; flags=()
+          else
+            tag="v$version-test.$GITHUB_RUN_NUMBER"; title="Kirtan Saathi $version (test build $GITHUB_RUN_NUMBER)"; flags=(--prerelease --target "$GITHUB_SHA")
+          fi
+          sed -e "s/{{VERSION}}/$version/g" -e "s/{{TAG}}/$tag/g" .github/release-notes.md > notes.md
+          gh release create "$tag" dist-installers/* --title "$title" --notes-file notes.md "${flags[@]}"
+          echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,81 @@
+# Installers for people who never use a command line:
+#   Windows  NSIS setup wizard, per-user (no administrator needed), shortcuts
+#   macOS    drag-to-Applications .dmg, one per CPU (Apple Silicon, Intel)
+#   Linux    .deb (double-click in Software) and AppImage
+# The acoustic model and the Gurbani database are bundled; nothing is
+# downloaded after installation. Built by .github/workflows/installers.yml.
+appId: io.github.sethigoldy.kirtansaathi
+productName: Kirtan Saathi
+copyright: Copyright © 2026 Kirtan Saathi contributors
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - "!dist/test/**"
+  - "!dist/renderer-build/**"
+  - "!**/*.map"
+  - package.json
+asar: true
+# Native ONNX Runtime binaries cannot be loaded from inside the asar archive.
+asarUnpack:
+  - node_modules/onnxruntime-node/bin/**
+extraResources:
+  - from: models
+    to: models
+    filter: [model.int8.onnx, edge-vocab.json]
+  - from: resources
+    to: resources
+    filter: [corpus.json.gz, meanings.json.gz]
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+# Drop ONNX Runtime binaries for other platforms / CPUs (saves ~200 MB).
+afterPack: scripts/after-pack.cjs
+# Chromium UI languages shipped (dialogs only; the app's own text is English and Gurmukhi).
+electronLanguages: [en-US, en-GB, hi]
+compression: normal
+# ONNX Runtime ships prebuilt N-API binaries; nothing to rebuild for Electron.
+npmRebuild: false
+publish: null
+
+mac:
+  category: public.app-category.music
+  icon: build/icon.icns
+  target: dmg
+  # With ad-hoc signing (no Apple certificate) this needs the
+  # disable-library-validation entitlement, which is included.
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
+  extendInfo:
+    NSMicrophoneUsageDescription: Kirtan Saathi listens to the kirtan or paath to show the matching Gurbani line. The audio is processed on this Mac and never sent anywhere.
+dmg:
+  title: Kirtan Saathi ${version}
+  artifactName: Kirtan-Saathi-${version}-Mac-${arch}.${ext}
+
+win:
+  icon: build/icon.ico
+  target: nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Kirtan Saathi
+  uninstallDisplayName: Kirtan Saathi
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  artifactName: Kirtan-Saathi-Setup-${version}.${ext}
+
+linux:
+  icon: build/icon.png
+  category: AudioVideo
+  synopsis: Shows the Gurbani line being sung or read, live
+  description: Listens to kirtan, paath or katha and shows the matching Gurbani line on screen, on a projector, in OBS and on phones. Works offline.
+  target: [deb, AppImage]
+  artifactName: Kirtan-Saathi-${version}-Linux-${arch}.${ext}
+deb:
+  artifactName: kirtan-saathi_${version}_${arch}.${ext}

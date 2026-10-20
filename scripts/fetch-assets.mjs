@@ -11,10 +11,21 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
-const HF = 'https://huggingface.co/karansea/indicconformer-stt-pa-ctc-shabad-preview/resolve/main';
+// Pinned revision and checksums: every build (and every installer) ships
+// exactly the model the benchmarks were run with.
+const HF_REVISION = '5fd2e89e3a43d31f47b0fb55fdce5ed50a91283f';
+const HF = `https://huggingface.co/karansea/indicconformer-stt-pa-ctc-shabad-preview/resolve/${HF_REVISION}`;
 const MODEL_FILES = [
-  { url: `${HF}/model.int8.onnx`, out: 'models/model.int8.onnx', minBytes: 150e6 },
-  { url: `${HF}/edge-vocab.json`, out: 'models/edge-vocab.json', minBytes: 1000 },
+  {
+    url: `${HF}/model.int8.onnx`,
+    out: 'models/model.int8.onnx',
+    sha256: '5f9e41d867dee2883796e290eef85abc11cbd32fe0f10c1f763a638d824634f9',
+  },
+  {
+    url: `${HF}/edge-vocab.json`,
+    out: 'models/edge-vocab.json',
+    sha256: '1e50a56595c6b2471b02152419d86f1e6275cfbe8ec4241cc6856730a6d00ea9',
+  },
 ];
 const SHABADOS_TGZ = 'https://registry.npmjs.org/@shabados/database/-/database-5.0.0-next.0.tgz';
 const SHABADOS_OUT = 'assets/shabados/master.sqlite';
@@ -47,14 +58,17 @@ function save(path, buf) {
   console.log(`  ${path}  ${(buf.length / 1e6).toFixed(1)} MB  sha256:${sha}…`);
 }
 
+const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+
 for (const f of MODEL_FILES) {
-  if (existsSync(f.out) && readFileSync(f.out).length >= f.minBytes) {
-    console.log(`  ${f.out} already present`);
+  if (existsSync(f.out) && sha256(readFileSync(f.out)) === f.sha256) {
+    console.log(`  ${f.out} already present (checksum ok)`);
     continue;
   }
   console.log(`downloading ${f.url}`);
   const buf = await download(f.url);
-  if (buf.length < f.minBytes) throw new Error(`${f.url}: unexpectedly small (${buf.length} bytes)`);
+  const got = sha256(buf);
+  if (got !== f.sha256) throw new Error(`${f.url}: checksum mismatch (expected ${f.sha256}, got ${got})`);
   save(f.out, buf);
 }
 

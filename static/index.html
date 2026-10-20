@@ -2,61 +2,173 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; media-src 'self' blob:; script-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; media-src 'self' blob:; script-src 'self'; frame-src http://127.0.0.1:*; img-src 'self' data:" />
   <title>Kirtan Saathi</title>
   <link rel="stylesheet" href="../static/styles.css" />
 </head>
 <body>
   <header class="bar">
-    <div class="brand">Kirtan Saathi <span class="phase">Phase 2</span></div>
-    <div id="status" class="pill pill-idle">Starting engine…</div>
-    <div class="controls">
-      <select id="mode" title="What is being recited">
-        <option value="kirtan">Kirtan</option>
-        <option value="paath">Paath — reading order</option>
-        <optgroup id="banis" label="Bani"></optgroup>
-      </select>
-      <select id="device" title="Input device"></select>
-      <button id="mic" class="primary" disabled>Start listening</button>
-      <label class="button" title="Play a recording and follow it">
-        Test with a file<input id="file" type="file" accept="audio/*,video/webm" hidden />
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="12" cy="24" r="3.4" />
+        <path d="M18 17.5a9 9 0 0 1 0 13M22.5 13a15 15 0 0 1 0 22" />
+        <rect x="28" y="15" width="14" height="4" rx="2" class="dim" />
+        <rect x="28" y="22" width="17" height="4" rx="2" />
+        <rect x="28" y="29" width="11" height="4" rx="2" class="dim" />
+      </svg>
+      <span>Kirtan Saathi</span>
+    </div>
+
+    <div class="modes" role="radiogroup" aria-label="What is being recited">
+      <button type="button" role="radio" data-mode="kirtan" aria-checked="true"><span lang="pa">ਕੀਰਤਨ</span> Kirtan</button>
+      <button type="button" role="radio" data-mode="paath" aria-checked="false"><span lang="pa">ਪਾਠ</span> Paath</button>
+      <button type="button" role="radio" data-mode="bani" aria-checked="false"><span lang="pa">ਬਾਣੀ</span> Bani</button>
+      <select id="bani" title="Which bani" hidden></select>
+    </div>
+
+    <div class="listen">
+      <label class="input-pick" title="Microphone or mixer input">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3" /></svg>
+        <select id="device" aria-label="Input"></select>
       </label>
-      <button id="reset" title="Clear the lock and search again">Reset</button>
-      <div class="meter" title="Input level"><div id="level"></div></div>
+      <div class="meter" title="Input level" aria-hidden="true"><div id="level"></div></div>
+      <button id="mic" class="primary" disabled>Start listening</button>
     </div>
   </header>
 
   <main>
     <section class="stage">
-      <div id="now" class="now empty">
-        <div id="now-line" class="tuk">ਉਡੀਕ…</div>
-        <div id="next-line" class="next"></div>
-        <div id="now-meta" class="meta">Listening for Gurbani</div>
+      <div class="status-row">
+        <div id="status" class="status status-idle" role="status">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="status-text">Starting…</span>
+        </div>
+        <div id="now-meta" class="now-meta"></div>
+        <div class="status-actions">
+          <label class="ghost" title="Play a recording and follow it">
+            Play a recording<input id="file" type="file" accept="audio/*,video/webm" hidden />
+          </label>
+          <button id="reset" class="ghost" title="Forget the current shabad and look again">Search again</button>
+        </div>
       </div>
-      <ol id="lines" class="lines"></ol>
+
+      <div class="screen">
+        <figure class="preview">
+          <div class="preview-wrap">
+            <iframe id="preview" tabindex="-1" title="What the sangat sees"></iframe>
+            <div id="blank-badge" class="blanked" hidden>Screen is blank</div>
+          </div>
+          <figcaption>On screen now</figcaption>
+        </figure>
+        <div class="steer">
+          <button id="prev" title="Previous line (Left arrow)"><kbd>←</kbd> Previous</button>
+          <button id="blank" title="Blank every screen (B)"><kbd>B</kbd> Blank</button>
+          <button id="next" title="Next line (Right arrow)">Next <kbd>→</kbd></button>
+        </div>
+      </div>
+
+      <ol id="guide" class="guide">
+        <li><strong>Choose what is being recited</strong> at the top: kirtan, paath, or a bani.</li>
+        <li><strong>Choose the input</strong>: the microphone, or the line from the gurdwara mixer (clearer).</li>
+        <li><strong>Press Start listening.</strong> The shabad appears here within a few seconds and follows along. Click any line to show it yourself.</li>
+      </ol>
+      <ol id="lines" class="lines" lang="pa"></ol>
     </section>
 
     <aside class="side">
-      <section>
-        <h2>Candidates</h2>
-        <ol id="candidates" class="candidates"><li class="muted">No candidates yet</li></ol>
-      </section>
-      <section>
-        <h2>Find a shabad</h2>
-        <form id="search-form"><input id="search" placeholder="Type Gurmukhi, e.g. ਪੋਥੀ ਪਰਮੇਸਰ" autocomplete="off" /></form>
-        <ol id="results" class="candidates"></ol>
-      </section>
-      <section>
-        <h2>Engine</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="screen">Screen</button>
+        <button role="tab" aria-selected="false" data-tab="share">Share</button>
+        <button role="tab" aria-selected="false" data-tab="find">Find</button>
+      </div>
+
+      <div class="panel" data-panel="screen">
+        <section class="group">
+          <h2>Projector</h2>
+          <div class="field-row">
+            <select id="proj-display" title="Screen for the sangat"></select>
+            <button id="proj-toggle" class="primary">Show</button>
+          </div>
+          <p id="proj-status" class="hint"></p>
+        </section>
+
+        <section class="group">
+          <h2>Look</h2>
+          <div class="size-row">
+            <span class="a-small" aria-hidden="true">ਅ</span>
+            <input id="font-scale" type="range" min="0.5" max="2.5" step="0.05" aria-label="Text size" />
+            <span class="a-large" aria-hidden="true">ਅ</span>
+          </div>
+          <div class="swatches" role="radiogroup" aria-label="Colours">
+            <label class="swatch sw-khanda"><input type="radio" name="theme" value="khanda" /><span class="chip"></span>Khanda</label>
+            <label class="swatch sw-dark"><input type="radio" name="theme" value="dark" /><span class="chip"></span>Dark</label>
+            <label class="swatch sw-saffron"><input type="radio" name="theme" value="saffron" /><span class="chip"></span>Blue</label>
+            <label class="swatch sw-light"><input type="radio" name="theme" value="light" /><span class="chip"></span>Light</label>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Hindi script</h2>
+          <div class="seg" role="radiogroup" aria-label="Hindi script">
+            <label><input type="radio" name="hindi" value="off" /><span>Off</span></label>
+            <label><input type="radio" name="hindi" value="below" /><span>Under the tuk</span></label>
+            <label><input type="radio" name="hindi" value="only" /><span>Hindi only</span></label>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Meaning <span lang="pa">ਅਰਥ</span></h2>
+          <div class="seg" role="radiogroup" aria-label="Meaning">
+            <label><input type="radio" name="meaning" value="off" /><span>Off</span></label>
+            <label><input type="radio" name="meaning" value="pa" /><span lang="pa">ਪੰਜਾਬੀ</span></label>
+            <label><input type="radio" name="meaning" value="hi" /><span lang="hi">हिंदी</span></label>
+            <label><input type="radio" name="meaning" value="both" /><span>Both</span></label>
+          </div>
+          <p class="hint">Hindi shows the Punjabi arth in Hindi script.</p>
+        </section>
+
+        <section class="group switches">
+          <label class="switch"><input type="checkbox" id="opt-vishraam" /><span class="track"></span>Vishraam colours</label>
+          <label class="switch"><input type="checkbox" id="opt-larivaar" /><span class="track"></span>Larivaar (joined words)</label>
+          <label class="switch"><input type="checkbox" id="opt-next" /><span class="track"></span>Next line in paath and banis</label>
+          <label class="switch"><input type="checkbox" id="opt-source" /><span class="track"></span>Source and ang</label>
+        </section>
+      </div>
+
+      <div class="panel" data-panel="share" hidden>
+        <section class="group">
+          <h2>Livestream</h2>
+          <p class="hint">In OBS, add a <em>Browser</em> source with this address, size 1920 × 1080. The background stays transparent.</p>
+          <div class="url-row"><code id="url-overlay"></code><button data-copy="url-overlay">Copy</button></div>
+        </section>
+        <section class="group">
+          <h2>Phones and tablets</h2>
+          <label class="switch"><input type="checkbox" id="opt-lan" /><span class="track"></span>Let phones on this Wi-Fi follow along</label>
+          <div id="lan-urls" class="lan"></div>
+        </section>
+      </div>
+
+      <div class="panel" data-panel="find" hidden>
+        <section class="group">
+          <h2>Find a shabad</h2>
+          <form id="search-form"><input id="search" placeholder="Type Gurmukhi, e.g. ਪੋਥੀ ਪਰਮੇਸਰ" autocomplete="off" lang="pa" /></form>
+          <ol id="results" class="candidates"></ol>
+        </section>
+        <section class="group">
+          <h2>Other possible shabads</h2>
+          <ol id="candidates" class="candidates"><li class="empty">They appear while listening.</li></ol>
+        </section>
+      </div>
+
+      <details class="details">
+        <summary>Technical details</summary>
         <dl id="stats" class="stats"></dl>
-        <details>
-          <summary>Raw recognizer output (debug, never shown to sangat)</summary>
-          <p id="asr" class="asr"></p>
-        </details>
-      </section>
+        <p class="hint">What the recognizer heard (never shown to the sangat):</p>
+        <p id="asr" class="asr" lang="pa"></p>
+      </details>
     </aside>
   </main>
-  <footer id="error" class="error" hidden></footer>
+  <footer id="error" class="error" role="alert" hidden></footer>
   <script type="module" src="./renderer.js"></script>
 </body>
 </html>

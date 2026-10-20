@@ -245,6 +245,13 @@ export class Engine {
     return this.tracker?.displayedLine ?? null;
   }
 
+  /** Next line in reading order while following paath / bani (else null). */
+  nextLine(): number | null {
+    if (!this.follower) return null;
+    const i = this.follower.index + 1;
+    return i < this.follower.stream.lines.length ? this.follower.stream.lines[i] : null;
+  }
+
   private currentShabad(): number | null {
     if (this.follower) return this.corpus.shabadOf[this.follower.line];
     return this.tracker?.shabad ?? null;
@@ -325,6 +332,40 @@ export class Engine {
   setLine(line: number): void {
     if (this.follower) this.follower.force(line);
     else this.tracker?.force(line);
+  }
+
+  /**
+   * Operator / remote: move the display `offset` lines. Paath and bani move
+   * through the reading stream (across shabads); kirtan moves through the
+   * locked shabad's singable lines. Returns the new line, or null.
+   */
+  stepLine(offset: number): number | null {
+    let lines: ArrayLike<number> & { indexOf(x: number): number };
+    let i: number;
+    if (this.follower) {
+      lines = this.follower.stream.lines;
+      i = this.follower.index;
+    } else if (this.tracker) {
+      lines = this.tracker.lines;
+      const shown = this.tracker.displayedLine;
+      i = shown === null ? (offset > 0 ? -1 : lines.length) : lines.indexOf(shown);
+    } else {
+      return null;
+    }
+    const j = Math.min(lines.length - 1, Math.max(0, i + offset));
+    if (j === i || lines.length === 0) return null;
+    this.setLine(lines[j]);
+    return lines[j];
+  }
+
+  /** What should be on screen right now. */
+  display(): { shabad: number | null; line: number | null; next: number | null; stream: string | null } {
+    return {
+      shabad: this.currentShabad(),
+      line: this.currentLine(),
+      next: this.nextLine(),
+      stream: this.follower?.stream.name ?? null,
+    };
   }
 
   /** Operator or auto: clear lock and evidence, start searching again. */

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pa">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Kirtan Saathi</title>
+  <link rel="stylesheet" href="/present/present.css" />
+</head>
+<body>
+  <div class="khanda" aria-hidden="true"></div>
+  <!-- Projector and overlay -->
+  <main id="stage" class="stage empty">
+    <div class="box">
+      <div id="current" class="tuk"></div>
+      <div id="next" class="next"></div>
+      <div id="source" class="source"></div>
+    </div>
+  </main>
+
+  <!-- Phone / tablet follow-along -->
+  <section id="follow" class="follow">
+    <header class="follow-bar">
+      <div class="follow-title">
+        <strong>Kirtan Saathi</strong>
+        <span id="follow-source">Connecting…</span>
+      </div>
+      <div class="follow-tools">
+        <button id="script" type="button" aria-label="Script: Gurmukhi, both, or Hindi">ਗੁਰਮੁਖੀ</button>
+        <button id="arth" type="button" aria-label="Meaning: off, Punjabi, Hindi, both">ਅਰਥ</button>
+        <button id="smaller" type="button" aria-label="Smaller text">A−</button>
+        <button id="larger" type="button" aria-label="Larger text">A+</button>
+      </div>
+    </header>
+    <ol id="lines" class="follow-lines"></ol>
+    <button id="live" class="live" type="button" hidden>Follow live line</button>
+  </section>
+
+  <div class="offline-note" role="status">Reconnecting to Kirtan Saathi…</div>
+  <script type="module" src="/present/present.js"></script>
+</body>
+</html>

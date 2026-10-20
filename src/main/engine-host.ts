@@ -11,6 +11,7 @@ import { Engine, type EngineEvent, type Transcriber } from '../engine/engine';
 import { Retriever } from '../engine/retrieval';
 import { Pacer } from '../engine/pacer';
 import type { FromEngine, ToEngine, UiCandidate, UiShabad } from './protocol';
+import type { DisplayReport } from './display-state';
 
 interface ParentPortLike {
   on(event: 'message', fn: (e: { data: unknown; ports: MessagePortLike[] }) => void): void;
@@ -33,6 +34,8 @@ let ready: FromEngine | null = null;
 let lastShabad: number | null | undefined;
 let pumping = false;
 const pacer = new Pacer();
+let shabadCache: UiShabad | null = null;
+let lastReport = '';
 
 function send(msg: FromEngine): void {
   port?.postMessage(msg);
@@ -50,6 +53,30 @@ function shabadPayload(index: number): UiShabad {
     page: s.page,
     lines: c.linesOf(index).map((line) => ({ line, inShabad: c.lineInShabad[line], text: c.text[line], role: c.role[line] })),
   };
+}
+
+function cachedShabad(index: number): UiShabad {
+  if (shabadCache?.index !== index) shabadCache = shabadPayload(index);
+  return shabadCache;
+}
+
+/** Tell main what the sangat should see (only when it changes). */
+function reportDisplay(): void {
+  if (!engine || !corpus) return;
+  const d = engine.display();
+  const mode = engine.currentMode.kind;
+  const key = `${mode}|${d.stream}|${d.shabad}|${d.line}|${d.next}`;
+  if (key === lastReport) return;
+  lastReport = key;
+  const c = corpus;
+  const report: DisplayReport = {
+    mode,
+    stream: d.stream,
+    shabad: d.shabad === null ? null : cachedShabad(d.shabad),
+    line: d.line,
+    next: d.next === null ? null : { line: d.next, text: c.text[d.next], role: c.role[d.next] },
+  };
+  parent.postMessage({ type: 'display', report });
 }
 
 function candidate(shabad: number, line: number, score: number, evidence: number): UiCandidate {
@@ -100,6 +127,7 @@ function emit(ev: EngineEvent): void {
       paceScale: engine!.opts.paceScale,
     },
   });
+  reportDisplay();
 }
 
 async function pump(): Promise<void> {
@@ -137,6 +165,9 @@ function handle(msg: ToEngine | null): void {
     case 'setLine':
       engine.setLine(msg.line);
       break;
+    case 'step':
+      engine.stepLine(msg.offset);
+      break;
     case 'reset':
       engine.reset();
       lastShabad = undefined;
@@ -150,9 +181,10 @@ function handle(msg: ToEngine | null): void {
         query: msg.query,
         results: res.shabads.slice(0, 8).map((h) => candidate(h.shabad, h.line, h.score, 0)),
       });
-      break;
+      return;
     }
   }
+  if (msg.type !== 'audio') reportDisplay();
 }
 
 function attach(p: MessagePortLike): void {
@@ -210,5 +242,8 @@ parent.on('message', (e) => {
     init(data.paths).catch((err) => send({ type: 'error', message: String((err as Error).message ?? err) }));
   } else if (data.type === 'attach' && e.ports[0]) {
     attach(e.ports[0]);
+  } else if (data.type === 'cmd') {
+    // Remote / projector controls arrive from main rather than the renderer.
+    handle((data as unknown as { msg: ToEngine }).msg);
   }
 });

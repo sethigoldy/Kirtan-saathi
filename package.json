@@ -1,6 +1,7 @@
 {
   "name": "kirtan-saathi",
-  "version": "0.2.0",
+  "productName": "Kirtan Saathi",
+  "version": "0.1.0",
   "description": "Kirtan Saathi: offline live Gurbani shabad detection and line following for kirtan, paath and banis",
   "private": true,
   "license": "MIT",
@@ -18,15 +19,29 @@
     "calibrate": "node dist/cli/calibrate.js",
     "paath-eval": "node dist/cli/paath-eval.js",
     "ci-bench": "node dist/cli/ci-bench.js",
-    "soak": "node dist/cli/soak.js"
+    "soak": "node dist/cli/soak.js",
+    "dist": "npm run build && electron-builder --publish never",
+    "icon": "python3 scripts/make-icon.py"
   },
   "dependencies": {
-    "@fontsource/noto-sans-gurmukhi": "^5.3.0",
     "onnxruntime-node": "1.23.2"
   },
   "devDependencies": {
+    "@fontsource-variable/anek-gurmukhi": "^5.3.0",
+    "@fontsource/noto-sans-devanagari": "^5.3.0",
+    "@fontsource/noto-sans-gurmukhi": "^5.3.0",
     "@types/node": "^22.0.0",
     "electron": "44.9.1",
+    "electron-builder": "26.15.3",
     "typescript": "^5.9.0"
+  },
+  "author": {
+    "name": "Kirtan Saathi contributors",
+    "email": "sethigoldy@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/sethigoldy/Kirtan-saathi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sethigoldy/Kirtan-saathi.git"
   }
 }
