@@ -1,5 +1,7 @@
 # Kirtan Saathi
 
+![The projector showing the live tuk with Hindi script and Prof. Sahib Singh's arth on the Light with Khanda theme](docs/screenshots/projector-khanda.png)
+
 Offline desktop app (Electron, Windows + macOS) that listens to a microphone, works out which Gurbani is being sung or recited, and shows the current tuk. It handles three situations:
 
 | Mode | For | What it does |
@@ -11,6 +13,47 @@ Offline desktop app (Electron, Windows + macOS) that listens to a microphone, wo
 Everything runs on the CPU with no network access at runtime. Only canonical Gurbani text is ever displayed; the recognizer's own transcript is used for matching only.
 
 Status: Phase 3. The engine handles kirtan, paath and bani modes. Outputs are a projector window, an OBS livestream overlay and a phone follow page. Optional Hindi script and Punjabi meanings can be shown under the tuk. Installers are built and tested in CI.
+
+## What it looks like
+
+### The operator window
+
+The sevadar runs everything from one window. The live preview shows exactly what the sangat sees. The shabad below follows the singer; click any line to show it.
+
+![Operator window following kirtan: live preview, previous / blank / next, the shabad with the current line marked, and display settings](docs/screenshots/operator-kirtan.png)
+
+On first start, three numbered steps explain what to do.
+
+![Operator window before listening, with the three steps to get started](docs/screenshots/getting-started.png)
+
+In paath mode the app follows the reading line by line, across shabads, and previews the next line.
+
+![Operator window following Japji Sahib in paath mode with the dark projector theme](docs/screenshots/operator-paath.png)
+
+### Projector
+
+The default theme is *Light with Khanda*. Optional extras under the tuk:
+
+- **Hindi script:** the tuk in Devanagari.
+- **Meaning:** Punjabi arth, in Gurmukhi and/or Hindi script.
+
+The source line shows the scripture, raag, ang and whose arth is shown, but not the author's name. Vishraam points are coloured.
+
+The dark theme, with the next line previewed during paath:
+
+![Projector in the dark theme during Japji Sahib paath, with the next line under the current one](docs/screenshots/projector-dark-paath.png)
+
+### Livestream overlay
+
+The overlay is a transparent lower third for OBS. Add it as a *Browser* source; it sits on top of the video.
+
+![Lower-third overlay with the tuk and its Punjabi arth over a video frame](docs/screenshots/livestream-overlay.png)
+
+### Phones
+
+The sangat can follow the whole shabad on their phones over the gurdwara Wi-Fi. The live line is highlighted. Each reader picks Gurmukhi or Hindi script, meanings and text size on their own phone.
+
+<img src="docs/screenshots/phone-follow.png" alt="Phone follow-along page with the whole shabad, Hindi script and meanings, current line highlighted" width="320" />
 
 ## Download
 
@@ -97,13 +140,13 @@ npm run run-file -- path/to/nitnem.mp3 --mode bani:JAPJ
 
 ### Recognition
 
-- **Mode.** Pick Kirtan, Paath, or a bani from the mode menu. Changing mode clears the lock.
+- **Mode.** Pick Kirtan, Paath, or Bani at the top. For Bani, also choose which bani. Changing mode starts a new search.
 - **Input.** Choose an input and press **Start listening**. Prefer a line feed from the gurdwara mixer over a laptop mic.
-- **Testing.** **Test with a file** plays a recording through the speakers while the engine follows it.
-- **Lock** on a candidate pins that shabad (or position in paath). Automatic switching and unlocking pause until **Reset**.
+- **Testing.** **Play a recording** plays a file through the speakers while the engine follows it.
+- **Pinning a shabad.** **Show this** on a shabad under *Find* pins it (or the position, in paath). Automatic switching pauses until **Search again**.
 - **Clicking a line** moves the display there; following continues from that line.
 - **Next line.** In paath and bani modes the next line is previewed under the current one.
-- **Find a shabad** searches typed Gurmukhi text.
+- **Find a shabad** (the *Find* tab) searches typed Gurmukhi text.
 
 ### Outputs
 
@@ -196,8 +239,8 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 
 ### Releasing a version
 
-1. Set `"version"` in `package.json`, for example `0.3.0`, and merge to `main`.
-2. Tag the release: `git tag v0.3.0 && git push origin v0.3.0`.
+1. Set `"version"` in `package.json` (semantic versioning: `0.1.1` fixes, `0.2.0` features) and merge to `main`.
+2. Tag the release with the same version: `git tag v0.2.0 && git push origin v0.2.0`.
 3. The *Installers* workflow publishes the release once all four installers pass their install test.
 
 To get a test build without tagging, use *Actions → Installers → Run workflow*. Tick *prerelease* to publish it as a pre-release.

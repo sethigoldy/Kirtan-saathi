@@ -16,6 +16,11 @@ for (const f of ['present.js', 'format.js']) {
   copyFileSync(join('dist/renderer-build/present', f), join('dist/static/present', f));
 }
 
+// Anek Gurmukhi (operator interface; SIL OFL 1.1), variable weight and width.
+for (const f of ['anek-gurmukhi-latin-wdth-normal.woff2', 'anek-gurmukhi-gurmukhi-wdth-normal.woff2']) {
+  copyFileSync(join('node_modules/@fontsource-variable/anek-gurmukhi/files', f), join('dist/static/fonts', f));
+}
+
 // Noto Sans Gurmukhi and Devanagari (SIL OFL 1.1), bundled so the app renders offline.
 for (const script of ['gurmukhi', 'devanagari']) {
   const fontDir = `node_modules/@fontsource/noto-sans-${script}/files`;

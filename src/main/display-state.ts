@@ -67,7 +67,7 @@ export class DisplayState extends EventEmitter {
     }
     // The author (Guru Sahib / Bhagat) is deliberately not shown with the tuk.
     const source = s
-      ? [r.stream && r.stream !== s.source ? r.stream : '', s.source, s.section, s.page > 0 ? `page ${s.page}` : '']
+      ? [r.stream && r.stream !== s.source ? r.stream : '', s.source, s.section, s.page > 0 ? `${/Granth/.test(s.source) ? 'Ang' : 'page'} ${s.page}` : '']
           .filter(Boolean)
           .join(' · ')
       : '';

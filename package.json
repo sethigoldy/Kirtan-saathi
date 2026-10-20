@@ -1,7 +1,7 @@
 {
   "name": "kirtan-saathi",
   "productName": "Kirtan Saathi",
-  "version": "0.3.0",
+  "version": "0.1.0",
   "description": "Kirtan Saathi: offline live Gurbani shabad detection and line following for kirtan, paath and banis",
   "private": true,
   "license": "MIT",
@@ -27,6 +27,7 @@
     "onnxruntime-node": "1.23.2"
   },
   "devDependencies": {
+    "@fontsource-variable/anek-gurmukhi": "^5.3.0",
     "@fontsource/noto-sans-devanagari": "^5.3.0",
     "@fontsource/noto-sans-gurmukhi": "^5.3.0",
     "@types/node": "^22.0.0",

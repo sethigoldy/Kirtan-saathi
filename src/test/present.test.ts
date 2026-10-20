@@ -50,7 +50,7 @@ test('display state emits only on real changes and hides next in kirtan', () => 
   assert.equal(seen.length, 1);
   assert.equal(seen[0].current?.line, 101);
   assert.equal(seen[0].next, null, 'kirtan never previews a next line');
-  assert.equal(seen[0].source, 'Sri Guru Granth Sahib · Raag Sorath · page 628', 'no author name with the tuk');
+  assert.equal(seen[0].source, 'Sri Guru Granth Sahib · Raag Sorath · Ang 628', 'no author name with the tuk');
 
   d.update(report(101, 'paath'));
   assert.equal(seen.at(-1)!.next?.line, 102, 'paath falls back to the next line in the shabad');

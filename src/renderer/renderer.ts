@@ -72,10 +72,15 @@ function renderTuk(el: HTMLElement, text: string): void {
   }
 }
 
-function setStatus(state: string, label: string): void {
-  const el = $('status');
-  el.className = `pill pill-${state}`;
-  el.textContent = label;
+function setStatus(state: 'idle' | 'listening' | 'searching' | 'locked' | 'error', label: string): void {
+  $('status').className = `status status-${state}`;
+  $('status-text').textContent = label;
+}
+
+/** Ang for the Granths, page for the other sources. */
+function pageLabel(source: string, page: number): string {
+  if (page <= 0) return '';
+  return /Granth/.test(source) ? `Ang ${page}` : `page ${page}`;
 }
 
 function renderShabad(): void {
@@ -104,21 +109,21 @@ function highlight(): void {
     if (on) li.scrollIntoView({ block: 'nearest' });
   }
   const s = shabad;
-  const shown = s && currentLine !== null && s.lines.some((l) => l.line === currentLine);
-  $('now-meta').textContent = shown
-    ? [streamName && streamName !== s!.source ? streamName : '', s!.source, s!.section, s!.page > 0 ? `page ${s!.page}` : '']
-        .filter(Boolean)
-        .join(' · ')
-    : s
-      ? 'Locked — waiting for a confident line'
-      : 'Listening for Gurbani';
+  const meta = $('now-meta');
+  meta.textContent = '';
+  if (s) {
+    const b = document.createElement('b');
+    b.textContent = streamName && streamName !== s.source ? streamName : s.source;
+    meta.append(b, ` ${[s.section, pageLabel(s.source, s.page)].filter(Boolean).join(', ')}`);
+  }
+  $('guide').hidden = !!s;
 }
 
 function renderCandidates(el: HTMLOListElement, items: UiCandidate[], emptyText: string): void {
   el.textContent = '';
   if (!items.length) {
     const li = document.createElement('li');
-    li.className = 'muted';
+    li.className = 'empty';
     li.textContent = emptyText;
     el.append(li);
     return;
@@ -131,9 +136,10 @@ function renderCandidates(el: HTMLOListElement, items: UiCandidate[], emptyText:
     const row = document.createElement('div');
     row.className = 'row';
     const info = document.createElement('span');
-    info.textContent = `${c.source}${c.page > 0 ? ` · page ${c.page}` : ''} · ${(c.score * 100).toFixed(0)}%`;
+    info.textContent = `${[c.source, pageLabel(c.source, c.page)].filter(Boolean).join(', ')} (${(c.score * 100).toFixed(0)}% match)`;
     const btn = document.createElement('button');
-    btn.textContent = 'Lock';
+    btn.textContent = 'Show this';
+    btn.title = 'Show this shabad and keep it until Search again';
     btn.addEventListener('click', () => send({ type: 'lock', shabad: c.shabad, line: c.line }));
     row.append(info, btn);
     li.append(text, row);
@@ -171,16 +177,18 @@ function renderStats(ev: UiEvent | null, ready?: Extract<FromEngine, { type: 're
 function onEngine(msg: FromEngine): void {
   switch (msg.type) {
     case 'ready': {
-      setStatus('idle', 'Ready');
+      setStatus('idle', 'Ready to listen');
       $<HTMLButtonElement>('mic').disabled = false;
-      const group = $('banis');
-      group.textContent = '';
+      const sel = $<HTMLSelectElement>('bani');
+      sel.textContent = '';
       for (const b of msg.banis) {
         const o = document.createElement('option');
-        o.value = `bani:${b.id}`;
-        o.textContent = `${b.nameEn} — ${b.name}`;
-        group.append(o);
+        o.value = b.id;
+        o.textContent = `${b.nameEn} (${b.name})`;
+        sel.append(o);
       }
+      const japji = msg.banis.find((b) => /japji/i.test(b.nameEn));
+      if (japji) sel.value = japji.id;
       renderStats(null, msg);
       break;
     }
@@ -188,7 +196,7 @@ function onEngine(msg: FromEngine): void {
       const el = $('error');
       el.hidden = false;
       el.textContent = msg.message;
-      setStatus('error', 'Error');
+      setStatus('error', 'Something needs attention');
       break;
     }
     case 'shabad':
@@ -198,13 +206,13 @@ function onEngine(msg: FromEngine): void {
       break;
     case 'event': {
       const ev = msg.ev;
-      if (ev.state === 'locked') setStatus('locked', `Locked · ${(ev.confidence * 100).toFixed(0)}%`);
-      else if (ev.state === 'searching') setStatus('searching', 'Searching…');
+      if (ev.state === 'locked') setStatus('locked', `Following (${(ev.confidence * 100).toFixed(0)}% sure)`);
+      else if (ev.state === 'searching') setStatus('searching', 'Listening for the shabad…');
       mode = ev.mode;
       streamName = ev.stream;
       currentLine = ev.line;
       highlight();
-      renderCandidates($<HTMLOListElement>('candidates'), ev.candidates, 'No candidates yet');
+      renderCandidates($<HTMLOListElement>('candidates'), ev.candidates, 'None yet.');
       $('asr').textContent = ev.asrText;
       renderStats(ev);
       break;
@@ -225,6 +233,7 @@ function showLevel(samples: Float32Array): void {
 async function listDevices(): Promise<void> {
   const sel = $<HTMLSelectElement>('device');
   const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+  const keep = sel.value;
   sel.textContent = '';
   for (const d of devices) {
     const o = document.createElement('option');
@@ -232,6 +241,22 @@ async function listDevices(): Promise<void> {
     o.textContent = d.label || `Input ${sel.length + 1}`;
     sel.append(o);
   }
+  if (!devices.length) {
+    const o = document.createElement('option');
+    o.value = '';
+    o.textContent = 'Default microphone';
+    sel.append(o);
+  }
+  if (keep && devices.some((d) => d.deviceId === keep)) sel.value = keep;
+}
+
+/** Start / stop button reflects whether audio is flowing. */
+function listening(on: boolean): void {
+  const b = $('mic');
+  b.textContent = on ? 'Stop listening' : 'Start listening';
+  b.classList.toggle('live', on);
+  if (on && !shabad) setStatus('listening', 'Listening for the shabad…');
+  if (!on) setStatus('idle', 'Not listening');
 }
 
 async function startMic(): Promise<void> {
@@ -302,7 +327,7 @@ async function startFile(file: File): Promise<void> {
     try { play.stop(); } catch { /* already stopped */ }
     void ctx.close();
     capture = null;
-    $('mic').textContent = 'Start listening';
+    listening(false);
   };
   capture = { stop };
 }
@@ -327,20 +352,20 @@ function micHelp(err: Error): string {
 function stopCapture(): void {
   capture?.stop();
   capture = null;
-  $('mic').textContent = 'Start listening';
+  listening(false);
   $('level').style.width = '0';
 }
 
 window.addEventListener('message', (e) => {
   const smokeMode = (e.data as { smokeMode?: string } | null)?.smokeMode;
   if (smokeMode) {
-    const sel = $<HTMLSelectElement>('mode');
-    sel.value = smokeMode;
-    sel.dispatchEvent(new Event('change'));
+    if (smokeMode.startsWith('bani:')) $<HTMLSelectElement>('bani').value = smokeMode.slice(5);
+    chooseMode(smokeMode.startsWith('bani:') ? 'bani' : (smokeMode as 'kirtan' | 'paath'));
     return;
   }
   const smoke = (e.data as { smokeAudio?: Float32Array } | null)?.smokeAudio;
   if (smoke) {
+    if (!$('mic').classList.contains('live')) listening(true);
     showLevel(smoke);
     send({ type: 'audio', samples: smoke });
     return;
@@ -356,7 +381,7 @@ $('mic').addEventListener('click', async () => {
   if (capture) return stopCapture();
   try {
     await startMic();
-    $('mic').textContent = 'Stop';
+    listening(true);
     $('error').hidden = true;
   } catch (err) {
     onEngine({ type: 'error', message: micHelp(err as Error) });
@@ -370,7 +395,7 @@ $<HTMLInputElement>('file').addEventListener('change', async (e) => {
   send({ type: 'reset' });
   try {
     await startFile(f);
-    $('mic').textContent = 'Stop';
+    listening(true);
   } catch (err) {
     onEngine({ type: 'error', message: `Could not play file: ${(err as Error).message}` });
   }
@@ -378,10 +403,31 @@ $<HTMLInputElement>('file').addEventListener('change', async (e) => {
 
 $('reset').addEventListener('click', () => send({ type: 'reset' }));
 
-$<HTMLSelectElement>('mode').addEventListener('change', (e) => {
-  const v = (e.target as HTMLSelectElement).value;
-  send({ type: 'mode', mode: v.startsWith('bani:') ? { kind: 'bani', id: v.slice(5) } : { kind: v as 'kirtan' | 'paath' } });
-});
+/** Mode buttons: Kirtan, Paath, Bani (with the bani picker beside it). */
+function chooseMode(m: 'kirtan' | 'paath' | 'bani'): void {
+  for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('.modes [data-mode]'))) {
+    b.setAttribute('aria-checked', String(b.dataset.mode === m));
+  }
+  const bani = $<HTMLSelectElement>('bani');
+  bani.hidden = m !== 'bani';
+  mode = m;
+  send({ type: 'mode', mode: m === 'bani' ? { kind: 'bani', id: bani.value } : { kind: m } });
+  if (capture) setStatus('listening', 'Listening for the shabad…');
+}
+for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('.modes [data-mode]'))) {
+  b.addEventListener('click', () => chooseMode(b.dataset.mode as 'kirtan' | 'paath' | 'bani'));
+}
+$('bani').addEventListener('change', () => chooseMode('bani'));
+
+/** Side panel tabs. */
+for (const t of Array.from(document.querySelectorAll<HTMLButtonElement>('.tabs [data-tab]'))) {
+  t.addEventListener('click', () => {
+    for (const o of Array.from(document.querySelectorAll<HTMLButtonElement>('.tabs [data-tab]'))) {
+      o.setAttribute('aria-selected', String(o === t));
+    }
+    for (const p of Array.from(document.querySelectorAll<HTMLElement>('.panel'))) p.hidden = p.dataset.panel !== t.dataset.tab;
+  });
+}
 
 $('search-form').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -395,14 +441,15 @@ const P = window.presentation;
 
 function renderView(v: DisplayView): void {
   view = v;
-  $('blank').classList.toggle('on', v.blank);
-  $('blank').textContent = v.blank ? 'Show again' : 'Blank';
+  const blank = $('blank');
+  blank.classList.toggle('on', v.blank);
+  blank.lastChild!.textContent = v.blank ? ' Show again' : ' Blank';
   $('blank-badge').hidden = !v.blank;
   const st = v.settings;
   $<HTMLInputElement>('font-scale').value = String(st.fontScale);
-  $<HTMLSelectElement>('theme').value = st.theme;
-  $<HTMLSelectElement>('hindi').value = st.hindi;
-  $<HTMLSelectElement>('meaning').value = st.meaning;
+  radio('theme', st.theme);
+  radio('hindi', st.hindi);
+  radio('meaning', st.meaning);
   $<HTMLInputElement>('opt-vishraam').checked = st.vishraam;
   $<HTMLInputElement>('opt-larivaar').checked = st.larivaar;
   $<HTMLInputElement>('opt-next').checked = st.nextLine;
@@ -423,20 +470,21 @@ function renderStatus(s: PresentStatus): void {
   for (const d of s.projector.displays) {
     const o = document.createElement('option');
     o.value = String(d.id);
-    o.textContent = `${d.label} — ${d.width}×${d.height}${d.primary ? ' (this screen)' : ''}`;
+    o.textContent = `${d.label}, ${d.width} × ${d.height}${d.primary ? ' (this screen)' : ''}`;
     sel.append(o);
   }
   sel.value = s.projector.displayId === null ? '' : String(s.projector.displayId);
   const p = s.projector;
   $('proj-toggle').textContent = p.enabled ? 'Hide' : 'Show';
   $('proj-toggle').classList.toggle('primary', !p.enabled);
+  $('proj-toggle').title = p.enabled ? 'Close the projector window' : 'Open the projector window on the chosen screen';
   const target = p.displays.find((d) => d.id === p.targetId);
   $('proj-status').textContent = p.enabled
     ? p.showing && target
       ? `Showing on ${target.label}${target.primary ? '. Press Esc on the projector to close it.' : '.'}`
       : 'Waiting for the chosen screen to be connected.'
     : p.displays.length > 1
-      ? 'Projector is off.'
+      ? 'Off. Press Show to put Gurbani on the projector.'
       : 'Only one screen is connected. Connect the projector, or show it here (Esc closes it).';
   $('url-overlay').textContent = s.server.urls.overlay;
   $<HTMLInputElement>('opt-lan').checked = s.server.lan;
@@ -458,14 +506,25 @@ function renderStatus(s: PresentStatus): void {
       lan.append(row);
     }
     const note = document.createElement('p');
-    note.className = 'muted';
-    note.textContent = 'Phones must be on the same Wi-Fi. Open this address in the phone browser.';
+    note.className = 'hint';
+    note.textContent = 'Open this address in the phone browser. The phone must be on the same Wi-Fi as this computer.';
     lan.append(note);
   }
 }
 
 function setting(patch: Partial<PresentationSettings>): void {
   void P.setSettings(patch);
+}
+
+function radio(name: string, value: string): void {
+  const el = document.querySelector<HTMLInputElement>(`input[name="${name}"][value="${value}"]`);
+  if (el) el.checked = true;
+}
+
+function onRadio(name: string, fn: (value: string) => void): void {
+  for (const el of Array.from(document.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`))) {
+    el.addEventListener('change', () => el.checked && fn(el.value));
+  }
 }
 
 $('proj-toggle').addEventListener('click', () => {
@@ -477,9 +536,9 @@ $('proj-display').addEventListener('change', (e) => {
   void P.setProjector({ enabled: !!status?.projector.enabled, displayId: v === '' ? null : Number(v) });
 });
 $('font-scale').addEventListener('input', (e) => setting({ fontScale: Number((e.target as HTMLInputElement).value) }));
-$('theme').addEventListener('change', (e) => setting({ theme: (e.target as HTMLSelectElement).value as PresentationSettings['theme'] }));
-$('hindi').addEventListener('change', (e) => setting({ hindi: (e.target as HTMLSelectElement).value as PresentationSettings['hindi'] }));
-$('meaning').addEventListener('change', (e) => setting({ meaning: (e.target as HTMLSelectElement).value as PresentationSettings['meaning'] }));
+onRadio('theme', (v) => setting({ theme: v as PresentationSettings['theme'] }));
+onRadio('hindi', (v) => setting({ hindi: v as PresentationSettings['hindi'] }));
+onRadio('meaning', (v) => setting({ meaning: v as PresentationSettings['meaning'] }));
 $('opt-vishraam').addEventListener('change', (e) => setting({ vishraam: (e.target as HTMLInputElement).checked }));
 $('opt-larivaar').addEventListener('change', (e) => setting({ larivaar: (e.target as HTMLInputElement).checked }));
 $('opt-next').addEventListener('change', (e) => setting({ nextLine: (e.target as HTMLInputElement).checked }));
