@@ -8,3 +8,4 @@ bench-out/
 smoke.png
 .bench-data/
 bench-results/
+release/

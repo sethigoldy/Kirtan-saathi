@@ -16,11 +16,12 @@ for (const f of ['present.js', 'format.js']) {
   copyFileSync(join('dist/renderer-build/present', f), join('dist/static/present', f));
 }
 
-// Noto Sans Gurmukhi (SIL OFL 1.1), bundled so the app renders offline.
-const fontDir = 'node_modules/@fontsource/noto-sans-gurmukhi/files';
-if (existsSync(fontDir)) {
+// Noto Sans Gurmukhi and Devanagari (SIL OFL 1.1), bundled so the app renders offline.
+for (const script of ['gurmukhi', 'devanagari']) {
+  const fontDir = `node_modules/@fontsource/noto-sans-${script}/files`;
+  if (!existsSync(fontDir)) throw new Error(`missing ${fontDir}: run npm install`);
   for (const w of ['400', '600']) {
-    const f = `noto-sans-gurmukhi-gurmukhi-${w}-normal.woff2`;
+    const f = `noto-sans-${script}-${script}-${w}-normal.woff2`;
     copyFileSync(join(fontDir, f), join('dist/static/fonts', f));
   }
 }

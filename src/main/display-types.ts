@@ -10,11 +10,19 @@ export interface PresentationSettings {
   vishraam: boolean;
   /** Show the next line under the current one (paath and bani modes). */
   nextLine: boolean;
-  /** Show source, raag, author and page under the line. */
+  /** Show source, raag and page under the line. */
   showSource: boolean;
   /** Multiplier on the base font size. */
   fontScale: number;
-  theme: 'dark' | 'light' | 'saffron';
+  /** Devanagari (Hindi script) transliteration: under the Gurmukhi, or instead of it. */
+  hindi: 'off' | 'below' | 'only';
+  /**
+   * Meaning (arth) under the tuk: Punjabi, Hindi, or both. Hindi uses a Hindi
+   * translation when one is bundled, otherwise the Punjabi arth in Hindi script.
+   */
+  meaning: 'off' | 'pa' | 'hi' | 'both';
+  /** 'khanda': light background with a Khanda watermark. */
+  theme: 'khanda' | 'dark' | 'light' | 'saffron';
 }
 
 export const DEFAULT_SETTINGS: PresentationSettings = {
@@ -23,7 +31,9 @@ export const DEFAULT_SETTINGS: PresentationSettings = {
   nextLine: true,
   showSource: true,
   fontScale: 1,
-  theme: 'dark',
+  hindi: 'off',
+  meaning: 'off',
+  theme: 'khanda',
 };
 
 export interface DisplayLine {
@@ -31,6 +41,10 @@ export interface DisplayLine {
   /** Canonical text with vishraam markers (';' major, '.' minor). */
   text: string;
   role: number;
+  /** Punjabi meaning (arth). */
+  pa?: string;
+  /** Hindi meaning, when a Hindi translation is bundled. */
+  hi?: string;
 }
 
 export interface DisplayShabad {
@@ -48,12 +62,14 @@ export interface DisplayView {
   blank: boolean;
   mode: 'kirtan' | 'paath' | 'bani';
   stream: string | null;
-  /** "Sri Guru Granth Sahib · Raag Gauree · Bhagat Kabir · page 335" */
+  /** "Sri Guru Granth Sahib · Raag Gauree · page 335" (no author name). */
   source: string;
   current: DisplayLine | null;
   next: DisplayLine | null;
   /** Whole shabad, for the follow page. */
   lines: DisplayLine[];
+  /** Whose arth is shown, e.g. "Arth: Prof. Sahib Singh" ('' when meanings are off). */
+  credit: string;
   settings: PresentationSettings;
 }
 

@@ -10,9 +10,38 @@
   font-weight: 600;
   font-display: block;
 }
+@font-face {
+  font-family: 'Noto Sans Devanagari';
+  src: url('/fonts/noto-sans-devanagari-devanagari-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Noto Sans Devanagari';
+  src: url('/fonts/noto-sans-devanagari-devanagari-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-display: block;
+}
 
 /* Themes: projector and follow pages. The overlay has its own colours. */
-:root, :root[data-theme='dark'] {
+:root, :root[data-theme='khanda'] {
+  --bg: #fbf4e4;
+  --bg-image: radial-gradient(ellipse at 50% 45%, #fffaf0 0%, #fbf3e1 55%, #f3e6c9 100%);
+  --fg: #1c1610;
+  --muted: #7a6a52;
+  --next: #4d4132;
+  --hindi: #5a4630;
+  --v-main: #c2410c;
+  --v-medium: #a16207;
+  --v-short: #15803d;
+  --rahao: #9a3412;
+  --current-bg: rgba(234, 150, 30, 0.16);
+  --rule: rgba(60, 40, 10, 0.1);
+  --khanda: rgba(204, 112, 0, 0.1);
+}
+:root[data-theme='dark'] {
+  --bg-image: none;
+  --hindi: #d8cfbf;
   --bg: #0b0908;
   --fg: #f6efe4;
   --muted: #a39887;
@@ -25,6 +54,8 @@
   --rule: rgba(255, 255, 255, 0.08);
 }
 :root[data-theme='light'] {
+  --bg-image: none;
+  --hindi: #4a4136;
   --bg: #fbf8f1;
   --fg: #17130f;
   --muted: #6f6556;
@@ -37,6 +68,8 @@
   --rule: rgba(0, 0, 0, 0.08);
 }
 :root[data-theme='saffron'] {
+  --bg-image: none;
+  --hindi: #dfe5ff;
   --bg: #0f1d45;
   --fg: #ffffff;
   --muted: #b9c3e6;
@@ -51,6 +84,7 @@
 
 :root {
   --gurmukhi: 'Noto Sans Gurmukhi', 'Gurmukhi MN', 'Raavi', sans-serif;
+  --devanagari: 'Noto Sans Devanagari', 'Kohinoor Devanagari', 'Nirmala UI', 'Mangal', sans-serif;
   --scale: 1;
   --follow-scale: 1;
   --overlay-size: 1;
@@ -60,7 +94,8 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
-  background: var(--bg);
+  background: var(--bg-image, none) var(--bg);
+  background-attachment: fixed;
   color: var(--fg);
   font: 16px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -70,6 +105,34 @@ button { font: inherit; }
 .v-main { color: var(--v-main); }
 .v-medium { color: var(--v-medium); }
 .v-short { color: var(--v-short); }
+
+/* Gurmukhi line with optional Hindi (Devanagari) transliteration */
+.hi { font-family: var(--devanagari); font-size: 0.62em; color: var(--hindi); margin-top: 0.2em; line-height: 1.4; }
+.hi.solo { font-family: var(--devanagari); font-size: 1em; color: inherit; margin-top: 0; }
+.follow-lines .hi { font-size: 0.72em; font-weight: 400; }
+.follow-lines li.current .hi { font-weight: 600; }
+
+/* Meaning (arth) under the tuk: smaller, regular weight */
+.arth { font-size: 0.5em; font-weight: 400; color: var(--next); margin-top: 0.45em; line-height: 1.45; }
+.arth-pa { font-family: var(--gurmukhi); }
+.arth-hi { font-family: var(--devanagari); }
+.arth-pa + .arth-hi { margin-top: 0.3em; }
+.tuk .arth { max-width: 80vw; margin-left: auto; margin-right: auto; }
+:root[data-layout='overlay'] .arth { color: var(--overlay-fg); opacity: 0.88; }
+.follow-lines .arth { font-size: 0.62em; color: var(--muted); }
+.follow-lines li.current .arth { color: var(--next); }
+
+/* Khanda watermark (Light with Khanda theme; never on the overlay) */
+.khanda {
+  display: none;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-color: var(--khanda);
+  -webkit-mask: url('/present/khanda.svg') center / auto 82vh no-repeat;
+  mask: url('/present/khanda.svg') center / auto 82vh no-repeat;
+}
+:root[data-theme='khanda']:not([data-layout='overlay']) .khanda { display: block; }
+:root[data-layout='follow'] .khanda { -webkit-mask-size: auto 55vh; mask-size: auto 55vh; }
+.stage, .follow { position: relative; z-index: 1; }
 
 /* Layout switching */
 :root[data-layout='follow'] .stage { display: none; }
@@ -113,6 +176,7 @@ button { font: inherit; }
 }
 .source:empty { display: none; }
 :root.blank .stage { opacity: 0; }
+:root[data-layout='overlay'] .hi { color: var(--overlay-fg); opacity: 0.9; }
 .stage.empty .box { opacity: 0; }
 
 /* ---------- OBS overlay (transparent page, lower third) ---------- */
@@ -148,6 +212,8 @@ button { font: inherit; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: max(10px, env(safe-area-inset-top)) 16px 10px;
   background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--rule);
 }
 .follow-title { display: flex; flex-direction: column; min-width: 0; }
@@ -155,7 +221,7 @@ button { font: inherit; }
 .follow-title span { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .follow-tools { display: flex; gap: 8px; flex: none; }
 .follow-tools button {
-  min-width: 44px; min-height: 44px; border-radius: 10px;
+  min-width: 44px; min-height: 44px; border-radius: 10px; padding: 0 10px;
   border: 1px solid var(--rule); background: transparent; color: var(--fg);
 }
 .follow-lines {
@@ -188,3 +254,11 @@ button { font: inherit; }
   background: #7a2e1c; color: #fff;
 }
 :root[data-layout='follow'].offline .offline-note { display: block; }
+
+/* Narrow phones: title on one row, reader controls on the next. */
+@media (max-width: 520px) {
+  .follow-bar { flex-wrap: wrap; }
+  .follow-title { flex: 1 1 100%; }
+  .follow-tools { flex: 1 1 100%; }
+  .follow-tools button { flex: 1; }
+}

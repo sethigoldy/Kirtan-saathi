@@ -5,6 +5,7 @@
  * renders the same view, so they can never disagree.
  */
 import { EventEmitter } from 'node:events';
+import type { MeaningLookup } from './meanings';
 
 import { DEFAULT_SETTINGS, type DisplayLine, type DisplayReport, type DisplayView, type PresentationSettings } from './display-types';
 
@@ -17,7 +18,7 @@ export class DisplayState extends EventEmitter {
   private blank = false;
   private settingsValue: PresentationSettings;
 
-  constructor(settings: Partial<PresentationSettings> = {}) {
+  constructor(settings: Partial<PresentationSettings> = {}, private readonly meanings: MeaningLookup | null = null) {
     super();
     this.settingsValue = sanitize({ ...DEFAULT_SETTINGS, ...settings });
   }
@@ -64,20 +65,27 @@ export class DisplayState extends EventEmitter {
       // (which may be in the next shabad); fall back to the next line here.
       next = r.next ?? (s ? s.lines[s.lines.indexOf(current) + 1] ?? null : null);
     }
+    // The author (Guru Sahib / Bhagat) is deliberately not shown with the tuk.
     const source = s
-      ? [r.stream && r.stream !== s.source ? r.stream : '', s.source, s.section, s.author, s.page > 0 ? `page ${s.page}` : '']
+      ? [r.stream && r.stream !== s.source ? r.stream : '', s.source, s.section, s.page > 0 ? `page ${s.page}` : '']
           .filter(Boolean)
           .join(' · ')
       : '';
+    const withMeaning = this.settingsValue.meaning !== 'off' && this.meanings !== null;
+    const m = this.meanings;
+    const add = (l: DisplayLine | null): DisplayLine | null =>
+      l && withMeaning ? { ...l, pa: m!.pa(l.line), hi: m!.hi(l.line) } : l;
+    const credit = withMeaning && current ? m!.credit(current.line) : '';
     return {
       seq: this.seq,
       blank: this.blank,
       mode: r.mode,
       stream: r.stream,
       source,
-      current,
+      current: add(current),
       next,
-      lines: s?.lines ?? [],
+      lines: withMeaning ? (s?.lines ?? []).map((l) => add(l)!) : s?.lines ?? [],
+      credit: credit ? `Arth: ${credit}` : '',
       settings: this.settingsValue,
     };
   }
@@ -95,6 +103,8 @@ function sanitize(s: PresentationSettings): PresentationSettings {
     nextLine: !!s.nextLine,
     showSource: !!s.showSource,
     fontScale: Math.min(2.5, Math.max(0.5, Number(s.fontScale) || 1)),
-    theme: s.theme === 'light' || s.theme === 'saffron' ? s.theme : 'dark',
+    hindi: s.hindi === 'below' || s.hindi === 'only' ? s.hindi : 'off',
+    meaning: s.meaning === 'pa' || s.meaning === 'hi' || s.meaning === 'both' ? s.meaning : 'off',
+    theme: s.theme === 'dark' || s.theme === 'light' || s.theme === 'saffron' ? s.theme : 'khanda',
   };
 }

@@ -27,7 +27,7 @@ export interface ProjectorStatus {
   displays: DisplayInfo[];
 }
 
-const THEME_BG: Record<string, string> = { dark: '#0b0908', light: '#fbf8f1', saffron: '#0f1d45' };
+const THEME_BG: Record<string, string> = { khanda: '#fbf4e4', dark: '#0b0908', light: '#fbf8f1', saffron: '#0f1d45' };
 
 export class Projector extends EventEmitter {
   private win: BrowserWindow | null = null;

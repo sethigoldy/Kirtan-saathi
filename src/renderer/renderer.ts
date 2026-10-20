@@ -22,6 +22,7 @@ declare global {
   interface Window {
     presentation: {
       init(): Promise<{ view: DisplayView; status: PresentStatus }>;
+      micAccess(): Promise<boolean>;
       setSettings(patch: Partial<PresentationSettings>): Promise<PresentationSettings>;
       control(action: 'blank' | 'unblank' | 'next' | 'prev'): Promise<void>;
       setProjector(p: { enabled: boolean; displayId: number | null }): Promise<void>;
@@ -105,7 +106,7 @@ function highlight(): void {
   const s = shabad;
   const shown = s && currentLine !== null && s.lines.some((l) => l.line === currentLine);
   $('now-meta').textContent = shown
-    ? [streamName && streamName !== s!.source ? streamName : '', s!.source, s!.section, s!.author, s!.page > 0 ? `page ${s!.page}` : '']
+    ? [streamName && streamName !== s!.source ? streamName : '', s!.source, s!.section, s!.page > 0 ? `page ${s!.page}` : '']
         .filter(Boolean)
         .join(' · ')
     : s
@@ -234,6 +235,11 @@ async function listDevices(): Promise<void> {
 }
 
 async function startMic(): Promise<void> {
+  if (!(await window.presentation.micAccess())) {
+    const denied = new Error('denied');
+    denied.name = 'NotAllowedError';
+    throw denied;
+  }
   const deviceId = $<HTMLSelectElement>('device').value || undefined;
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
@@ -351,6 +357,7 @@ $('mic').addEventListener('click', async () => {
   try {
     await startMic();
     $('mic').textContent = 'Stop';
+    $('error').hidden = true;
   } catch (err) {
     onEngine({ type: 'error', message: micHelp(err as Error) });
   }
@@ -394,6 +401,8 @@ function renderView(v: DisplayView): void {
   const st = v.settings;
   $<HTMLInputElement>('font-scale').value = String(st.fontScale);
   $<HTMLSelectElement>('theme').value = st.theme;
+  $<HTMLSelectElement>('hindi').value = st.hindi;
+  $<HTMLSelectElement>('meaning').value = st.meaning;
   $<HTMLInputElement>('opt-vishraam').checked = st.vishraam;
   $<HTMLInputElement>('opt-larivaar').checked = st.larivaar;
   $<HTMLInputElement>('opt-next').checked = st.nextLine;
@@ -469,6 +478,8 @@ $('proj-display').addEventListener('change', (e) => {
 });
 $('font-scale').addEventListener('input', (e) => setting({ fontScale: Number((e.target as HTMLInputElement).value) }));
 $('theme').addEventListener('change', (e) => setting({ theme: (e.target as HTMLSelectElement).value as PresentationSettings['theme'] }));
+$('hindi').addEventListener('change', (e) => setting({ hindi: (e.target as HTMLSelectElement).value as PresentationSettings['hindi'] }));
+$('meaning').addEventListener('change', (e) => setting({ meaning: (e.target as HTMLSelectElement).value as PresentationSettings['meaning'] }));
 $('opt-vishraam').addEventListener('change', (e) => setting({ vishraam: (e.target as HTMLInputElement).checked }));
 $('opt-larivaar').addEventListener('change', (e) => setting({ larivaar: (e.target as HTMLInputElement).checked }));
 $('opt-next').addEventListener('change', (e) => setting({ nextLine: (e.target as HTMLInputElement).checked }));

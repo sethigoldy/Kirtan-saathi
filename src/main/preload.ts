@@ -20,6 +20,7 @@ ipcRenderer.on('smoke-audio', (_e, samples: Float32Array) => {
 // exposed; the page never gets ipcRenderer itself.
 contextBridge.exposeInMainWorld('presentation', {
   init: () => ipcRenderer.invoke('present:init'),
+  micAccess: () => ipcRenderer.invoke('mic:access'),
   setSettings: (patch: unknown) => ipcRenderer.invoke('present:settings', patch),
   control: (action: string) => ipcRenderer.invoke('present:control', action),
   setProjector: (p: unknown) => ipcRenderer.invoke('present:projector', p),

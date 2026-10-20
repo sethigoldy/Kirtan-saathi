@@ -57,9 +57,25 @@
         <label class="field">Text size <input id="font-scale" type="range" min="0.5" max="2.5" step="0.05" /></label>
         <label class="field">Colours
           <select id="theme">
+            <option value="khanda">Light with Khanda</option>
             <option value="dark">Dark</option>
             <option value="saffron">Blue and saffron</option>
             <option value="light">Light</option>
+          </select>
+        </label>
+        <label class="field">Hindi (Devanagari)
+          <select id="hindi">
+            <option value="off">Off — Gurmukhi only</option>
+            <option value="below">Under the Gurmukhi</option>
+            <option value="only">Hindi only</option>
+          </select>
+        </label>
+        <label class="field">Meaning (arth) under the tuk
+          <select id="meaning">
+            <option value="off">Off</option>
+            <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+            <option value="hi">Hindi script (हिंदी)</option>
+            <option value="both">Punjabi and Hindi</option>
           </select>
         </label>
         <label class="check"><input type="checkbox" id="opt-vishraam" /> Vishraam colours</label>

@@ -7,12 +7,17 @@
  *   /follow     phone / tablet follow-along: whole shabad, live line highlighted
  *
  * Overlay query parameters: size (multiplier), position (bottom|top|center),
- * box (1|0), next (1|0), source (1|0), color (hex without #).
+ * box (1|0), next (1|0), source (1|0), color (hex without #),
+ * hindi (off|below|only), meaning (off|pa|hi|both).
  */
 import type { DisplayLine, DisplayView } from '../main/display-types';
-import { tokens } from './format.js';
+import { toDevanagari, tokens } from './format.js';
 
 type Layout = 'projector' | 'overlay' | 'follow';
+type Hindi = 'off' | 'below' | 'only';
+const HINDI: Hindi[] = ['off', 'below', 'only'];
+type Meaning = 'off' | 'pa' | 'hi' | 'both';
+const MEANING: Meaning[] = ['off', 'pa', 'hi', 'both'];
 
 const ROLE_RAHAO = 1;
 const ROLE_HEADER = 2;
@@ -43,19 +48,81 @@ if (layout === 'overlay') {
 let view: DisplayView | null = null;
 let lastFollowShabad = '';
 let userScrolledAt = 0;
+/** Follow page: the reader's own Hindi choice (null = use the operator's). */
+let localHindi: Hindi | null = null;
+let localMeaning: Meaning | null = null;
 
-/** Render a line into `el`: vishraam colouring and larivaar per settings. */
-function renderLine(el: HTMLElement, line: DisplayLine | null): void {
-  el.textContent = '';
-  if (!line || !view) return;
-  const s = view.settings;
-  for (const t of tokens(line.text, { larivaar: s.larivaar, vishraam: s.vishraam })) {
+function meaningMode(v: DisplayView): Meaning {
+  const q = query.get('meaning') as Meaning | null;
+  if (q && MEANING.includes(q)) return q;
+  if (layout === 'follow' && localMeaning) return localMeaning;
+  return v.settings.meaning;
+}
+
+function hindiMode(v: DisplayView): Hindi {
+  const q = query.get('hindi') as Hindi | null;
+  if (q && HINDI.includes(q)) return q;
+  if (layout === 'follow' && localHindi) return localHindi;
+  return v.settings.hindi;
+}
+
+function appendTokens(el: HTMLElement, text: string, hindi: boolean): void {
+  const s = view!.settings;
+  for (const t of tokens(text, { larivaar: s.larivaar, vishraam: s.vishraam, hindi })) {
     if (t.gap) el.append(t.gap);
     const span = document.createElement('span');
     span.textContent = t.text;
     if (t.pause) span.className = `v-${t.pause}`;
     if (t.mark) span.classList.add('mark');
     el.append(span);
+  }
+}
+
+/**
+ * Render a line into `el`: Gurmukhi and / or Hindi (Devanagari), with
+ * vishraam colouring and larivaar per settings.
+ */
+function renderLine(el: HTMLElement, line: DisplayLine | null, hindi: Hindi, meaning: Meaning = 'off'): void {
+  el.textContent = '';
+  if (!line || !view) return;
+  renderTuk(el, line, hindi);
+  // Meaning (arth) just under the tuk, smaller.
+  const pa = line.pa ?? '';
+  if (meaning === 'off' || !pa) return;
+  const arth = document.createElement('div');
+  arth.className = 'arth';
+  if (meaning === 'pa' || meaning === 'both') {
+    const d = document.createElement('div');
+    d.className = 'arth-pa';
+    d.lang = 'pa';
+    d.textContent = pa;
+    arth.append(d);
+  }
+  if (meaning === 'hi' || meaning === 'both') {
+    const d = document.createElement('div');
+    d.className = 'arth-hi';
+    d.lang = 'hi';
+    // A bundled Hindi translation when there is one, else the Punjabi arth in Hindi script.
+    d.textContent = line.hi || toDevanagari(pa);
+    arth.append(d);
+  }
+  el.append(arth);
+}
+
+function renderTuk(el: HTMLElement, line: DisplayLine, hindi: Hindi): void {
+  if (hindi !== 'only') {
+    const gu = document.createElement('div');
+    gu.className = 'gu';
+    gu.lang = 'pa';
+    appendTokens(gu, line.text, false);
+    el.append(gu);
+  }
+  if (hindi !== 'off') {
+    const hi = document.createElement('div');
+    hi.className = hindi === 'only' ? 'hi solo' : 'hi';
+    hi.lang = 'hi';
+    appendTokens(hi, line.text, true);
+    el.append(hi);
   }
 }
 
@@ -85,12 +152,13 @@ function renderStage(v: DisplayView): void {
   const cur = $('current');
   const next = $('next');
   const src = $('source');
+  const hindi = hindiMode(v);
   const changed = cur.dataset.line !== String(v.current?.line ?? '');
   cur.dataset.line = String(v.current?.line ?? '');
-  renderLine(cur, v.current);
+  renderLine(cur, v.current, hindi, meaningMode(v));
   cur.classList.toggle('rahao', v.current?.role === ROLE_RAHAO);
-  renderLine(next, showNext(v) ? v.next : null);
-  src.textContent = showSource(v) ? v.source : '';
+  renderLine(next, showNext(v) ? v.next : null, hindi);
+  src.textContent = showSource(v) ? [v.source, meaningMode(v) !== 'off' ? v.credit : ''].filter(Boolean).join(' · ') : '';
   stage.classList.toggle('empty', !v.current);
   if (layout === 'projector') {
     fit(cur, window.innerHeight * (next.textContent ? 0.55 : 0.75));
@@ -108,7 +176,9 @@ function renderStage(v: DisplayView): void {
 /** Follow page: whole shabad, current line highlighted and kept in view. */
 function renderFollow(v: DisplayView): void {
   const list = $('lines');
-  const key = `${v.lines[0]?.line ?? ''}|${v.settings.larivaar}|${v.settings.vishraam}`;
+  const hindi = hindiMode(v);
+  const meaning = meaningMode(v);
+  const key = `${v.lines[0]?.line ?? ''}|${v.settings.larivaar}|${v.settings.vishraam}|${hindi}|${meaning}|${v.lines[0]?.pa !== undefined}`;
   if (key !== lastFollowShabad) {
     lastFollowShabad = key;
     list.textContent = '';
@@ -117,12 +187,12 @@ function renderFollow(v: DisplayView): void {
       li.dataset.line = String(l.line);
       if (l.role === ROLE_HEADER || l.role === ROLE_MANGAL) li.classList.add('header');
       if (l.role === ROLE_RAHAO) li.classList.add('rahao');
-      renderLine(li, l);
+      renderLine(li, l, hindi, meaning);
       list.append(li);
     }
     window.scrollTo({ top: 0 });
   }
-  $('follow-source').textContent = v.source || 'Waiting for the shabad…';
+  $('follow-source').textContent = [v.source, meaning !== 'off' ? v.credit : ''].filter(Boolean).join(' · ') || 'Waiting for the shabad…';
   let current: HTMLElement | null = null;
   for (const li of Array.from(list.children) as HTMLElement[]) {
     const on = v.current !== null && li.dataset.line === String(v.current.line);
@@ -142,6 +212,7 @@ function render(v: DisplayView): void {
   root.style.setProperty('--scale', String(v.settings.fontScale));
   if (layout === 'follow') renderFollow(v);
   else renderStage(v);
+  window.dispatchEvent(new Event('ks-view'));
 }
 
 function connect(): void {
@@ -182,6 +253,56 @@ if (layout === 'follow') {
   $('larger').addEventListener('click', () => {
     scale = Math.min(2.5, +(scale + 0.1).toFixed(2));
     apply();
+  });
+  // Hindi: each reader can choose Gurmukhi, both, or Hindi only on their phone.
+  const hindiKey = 'ks-follow-hindi';
+  try {
+    const saved = localStorage.getItem(hindiKey) as Hindi | null;
+    if (saved && HINDI.includes(saved)) localHindi = saved;
+  } catch {
+    /* storage unavailable */
+  }
+  const label = () => {
+    const mode = view ? hindiMode(view) : localHindi ?? 'off';
+    $('script').textContent = mode === 'off' ? 'ਗੁਰਮੁਖੀ' : mode === 'below' ? 'ਗੁ + हि' : 'हिंदी';
+  };
+  $('script').addEventListener('click', () => {
+    const cur = view ? hindiMode(view) : 'off';
+    localHindi = HINDI[(HINDI.indexOf(cur) + 1) % HINDI.length];
+    try {
+      localStorage.setItem(hindiKey, localHindi);
+    } catch {
+      /* not persisted */
+    }
+    if (view) renderFollow(view);
+    label();
+  });
+  // Meaning: each reader can choose off / Punjabi / Hindi / both.
+  const meaningKey = 'ks-follow-meaning';
+  try {
+    const saved = localStorage.getItem(meaningKey) as Meaning | null;
+    if (saved && MEANING.includes(saved)) localMeaning = saved;
+  } catch {
+    /* storage unavailable */
+  }
+  const meaningLabel = () => {
+    const mode = view ? meaningMode(view) : localMeaning ?? 'off';
+    $('arth').textContent = { off: 'ਅਰਥ ✕', pa: 'ਅਰਥ', hi: 'अर्थ', both: 'ਅਰਥ+अर्थ' }[mode];
+  };
+  $('arth').addEventListener('click', () => {
+    const cur = view ? meaningMode(view) : 'off';
+    localMeaning = MEANING[(MEANING.indexOf(cur) + 1) % MEANING.length];
+    try {
+      localStorage.setItem(meaningKey, localMeaning);
+    } catch {
+      /* not persisted */
+    }
+    if (view) renderFollow(view);
+    meaningLabel();
+  });
+  window.addEventListener('ks-view', () => {
+    label();
+    meaningLabel();
   });
   $('live').addEventListener('click', () => {
     userScrolledAt = 0;

@@ -19,6 +19,7 @@ import {
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DisplayState, type DisplayReport, type PresentationSettings } from './display-state';
+import { Meanings } from './meanings';
 import { Projector } from './projector';
 import { PresentationServer, type ControlAction } from './server';
 import { SettingsStore } from './settings';
@@ -39,6 +40,15 @@ function appBase(): string {
 function resourcePaths(): { models: string; corpus: string } {
   const base = appBase();
   return { models: join(base, 'models'), corpus: join(base, 'resources', 'corpus.json.gz') };
+}
+
+function loadMeanings(): Meanings | null {
+  try {
+    return Meanings.load(join(appBase(), 'resources', 'meanings.json.gz'));
+  } catch (e) {
+    console.error(`meanings unavailable: ${(e as Error).message}`);
+    return null;
+  }
 }
 
 function startEngine(): UtilityProcess {
@@ -97,6 +107,14 @@ function control(action: ControlAction): void {
 }
 
 function registerIpc(): void {
+  // macOS asks once, when the operator first presses Start listening.
+  ipcMain.handle('mic:access', async () => {
+    if (process.platform !== 'darwin') return true;
+    const status = systemPreferences.getMediaAccessStatus('microphone');
+    if (status === 'granted') return true;
+    if (status === 'not-determined') return systemPreferences.askForMediaAccess('microphone').catch(() => false);
+    return false;
+  });
   ipcMain.handle('present:init', () => ({ view: display.view(), status: presentStatus() }));
   ipcMain.handle('present:settings', (_e, patch: Partial<PresentationSettings>) => {
     const next = display.updateSettings(patch ?? {});
@@ -215,13 +233,10 @@ if (!app.requestSingleInstanceLock() && !process.env.GURBANI_SMOKE) {
     // Microphone only, and only for the operator window's own page.
     session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(permission === 'media' && wc === win?.webContents));
     session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media');
-    if (process.platform === 'darwin') {
-      await systemPreferences.askForMediaAccess('microphone').catch(() => false);
-    }
 
     settings = new SettingsStore(join(app.getPath('userData'), 'settings.json'));
     const s = settings.get();
-    display = new DisplayState(s.presentation);
+    display = new DisplayState(s.presentation, loadMeanings());
     server = new PresentationServer(
       display,
       { port: s.server.port, lan: s.server.lan, pin: s.server.pin, staticDir: join(__dirname, '..', 'static') },

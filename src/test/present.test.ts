@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import { DisplayState, type DisplayReport, type DisplayView } from '../main/display-state';
 import { controlAllowed, PresentationServer, type ControlAction } from '../main/server';
 import { parseSettings, SettingsStore } from '../main/settings';
-import { plainText, tokens } from '../present/format';
+import { plainText, toDevanagari, tokens } from '../present/format';
+import { Meanings } from '../main/meanings';
 
 const SHABAD = {
   index: 7,
@@ -49,7 +50,7 @@ test('display state emits only on real changes and hides next in kirtan', () => 
   assert.equal(seen.length, 1);
   assert.equal(seen[0].current?.line, 101);
   assert.equal(seen[0].next, null, 'kirtan never previews a next line');
-  assert.match(seen[0].source, /Raag Sorath · Guru Arjan Dev Ji · page 628/);
+  assert.equal(seen[0].source, 'Sri Guru Granth Sahib · Raag Sorath · page 628', 'no author name with the tuk');
 
   d.update(report(101, 'paath'));
   assert.equal(seen.at(-1)!.next?.line, 102, 'paath falls back to the next line in the shabad');
@@ -59,9 +60,38 @@ test('display state emits only on real changes and hides next in kirtan', () => 
   assert.equal(seen.length, 3);
   assert.equal(seen.at(-1)!.blank, true);
 
-  const s = d.updateSettings({ fontScale: 9, theme: 'nope' as never });
+  const s = d.updateSettings({ fontScale: 9, theme: 'nope' as never, hindi: 'x' as never, meaning: 'y' as never });
   assert.equal(s.fontScale, 2.5);
-  assert.equal(s.theme, 'dark');
+  assert.equal(s.theme, 'khanda', 'invalid theme falls back to the default');
+  assert.equal(s.hindi, 'off');
+  assert.equal(s.meaning, 'off');
+});
+
+test('Gurmukhi to Devanagari follows Hindi gutka conventions', () => {
+  assert.equal(toDevanagari('ਸਤਿ ਨਾਮੁ ਕਰਤਾ ਪੁਰਖੁ ਨਿਰਭਉ ਨਿਰਵੈਰੁ'), 'सति नामु करता पुरखु निरभउ निरवैरु');
+  assert.equal(toDevanagari('ਸੱਚ ਅੱਖਰ ਪੱਥਰ'), 'सच्च अक्खर पत्थर', 'addak doubles; aspirates pair with the plain letter');
+  assert.equal(toDevanagari('ਸ਼ਬਦ ਖ਼ਾਲਸਾ ਗੋਬਿੰਦ ਆਂਗਨ'), 'शबद ख़ालसा गोबिंद आंगन');
+  assert.equal(toDevanagari('ਐਸਾ ਔਰ ਉਤਮੁ ॥੧॥'), 'ऐसा और उतमु ॥१॥');
+  assert.equal(toDevanagari('ੴ'), 'ੴ');
+  const hi = tokens('ਗੁਰਿ ਪੂਰੈ; ਕਿਰਪਾ ਧਾਰੀ ॥', { larivaar: false, vishraam: true, hindi: true });
+  assert.deepEqual(hi.map((t) => [t.text, t.pause]), [['गुरि', null], ['पूरै', 'main'], ['किरपा', null], ['धारी', null], ['॥', null]]);
+});
+
+test('meanings attach to every line only when switched on, with a credit', () => {
+  const pa = Array<string>(200).fill('');
+  const src = Array<number>(200).fill(-1);
+  pa[101] = 'ਪੂਰੇ ਗੁਰੂ ਨੇ ਮੇਹਰ ਕੀਤੀ';
+  src[101] = 0;
+  const m = Meanings.from({ sources: [{ id: 'PSST', name: 'Prof. Sahib Singh, Sri Guru Granth Darpan' }], pa, paSource: src });
+  const d = new DisplayState({}, m);
+  d.update(report(101));
+  assert.equal(d.view().current?.pa, undefined, 'off by default');
+  assert.equal(d.view().credit, '');
+  d.updateSettings({ meaning: 'both' });
+  const v = d.view();
+  assert.equal(v.current?.pa, 'ਪੂਰੇ ਗੁਰੂ ਨੇ ਮੇਹਰ ਕੀਤੀ');
+  assert.equal(v.lines.find((l) => l.line === 101)?.pa, 'ਪੂਰੇ ਗੁਰੂ ਨੇ ਮੇਹਰ ਕੀਤੀ');
+  assert.equal(v.credit, 'Arth: Prof. Sahib Singh');
 });
 
 test('control is open on loopback, PIN-gated on the LAN', () => {
