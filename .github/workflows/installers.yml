@@ -120,6 +120,9 @@ jobs:
               # reporting the app as damaged.
               echo "No Apple certificate: ad-hoc signing"
               export CSC_IDENTITY_AUTO_DISCOVERY=false
+              # electron-builder skips signing on pull-request builds by default;
+              # an unsigned arm64 app is reported as damaged, so sign PR builds too.
+              export CSC_FOR_PULL_REQUEST=true
               # (Hardened runtime stays on: the entitlements include
               # disable-library-validation, which ad-hoc signing needs.)
               extra+=(-c.mac.identity=-)
