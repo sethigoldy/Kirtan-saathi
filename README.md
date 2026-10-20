@@ -10,11 +10,11 @@ Live, blind, on the [Live Gurbani Captioning benchmark v1](https://github.com/ka
 
 | Recording | Full | Join at 33% | Join at 66% | First correct lock (full / 33% / 66%) |
 |---|---|---|---|---|
-| IZOsmkdmmcg (Saarang M5, 7.7 min) | 93.2% | 90.6% | 92.3% | 7 s / 5 s / 8 s |
-| kZhIA8P6xWI (Goojree M1, 5.1 min) | 91.8% | 90.8% | 90.5% | 28 s / 15 s / 7 s |
-| kchMJPK9Axs (Gauree, Bhagat Kabir, 10.9 min) | 96.9% | 93.4% | 95.0% | 9 s / 23 s / 7 s |
-| zOtIpxMT9hU (Maaroo M5, 4.9 min) | 36.6% | 54.6% | 49.5% | 163 s / 66 s / 17 s |
-| **Overall** | | | | **85.2%** (2918/3425 frames) |
+| IZOsmkdmmcg (Saarang M5, 7.7 min) | 97.6% | 97.1% | 96.2% | 7 s / 5 s / 8 s |
+| kZhIA8P6xWI (Goojree M1, 5.1 min) | 91.1% | 89.4% | 89.5% | 28 s / 15 s / 7 s |
+| kchMJPK9Axs (Gauree, Bhagat Kabir, 10.9 min) | 96.8% | 93.2% | 94.6% | 9 s / 23 s / 7 s |
+| zOtIpxMT9hU (Maaroo M5, 4.9 min) | 47.4% | 69.9% | 79.8% | 163 s / 66 s / 17 s |
+| **Overall** | | | | **88.9%** (3046/3425 frames) |
 
 - **Reference points.** The published reference system scores 57.9%. A perfect transcript delayed by 5 s scores 85.5%.
 - **No wrong shabads.** No frame showed a wrong shabad in any case. Adding each decode's measured latency on a 2-vCPU Xeon @ 2.1 GHz leaves the score unchanged.
@@ -37,6 +37,12 @@ Prerequisites: Node.js 22 or later.
 npm install
 npm run fetch-assets      # model (184 MB) + Shabad OS database
 npm start                 # builds and launches the app
+```
+
+Follow a recording from the command line (non-WAV input needs ffmpeg):
+
+```bash
+npm run run-file -- path/to/kirtan.mp3
 ```
 
 In the app, either:
@@ -82,6 +88,8 @@ mic (16 kHz mono, AudioWorklet)
 - **Similar consonants:** the alignment scores near-misses as partial matches (`src/engine/align.ts`). These cover aspiration and voicing pairs, retroflex vs. dental, and Punjabi tonal devoicing, where ਭ ਧ ਘ ਝ ਢ are spoken like ਪ ਤ ਕ ਚ ਟ.
 
 **Repeat-tolerant alignment.** Kirtan repeats phrases and returns to the rahao. The alignment may restart at a line start, a vishraam or a word start, so "ਸਮਝੁ ਮਨੁ ਬਉਰਾ ਸਮਝੁ ਮਨੁ ਬਉਰਾ" is fully explained by one line. Restarts mid-word are not allowed, so a long shabad cannot be stitched together from fragments.
+
+**Holding through instrumentals.** Tabla and harmonium passages decode as consonant soup that matches every line a little. When no line explains at least 60% of the last 3 s, the tracker holds the current line. When nothing in the corpus explains at least 60% of a 10 s window, those windows don't count toward unlocking. The 0.6 value was set on one tabla solo in the benchmark; scores are flat from 0.6 to 0.7.
 
 **Paced decoding.** At startup the engine decodes 5 s of audio to measure this machine's speed and lengthens the hops on slow CPUs. It adapts again during use. Decoding always uses the newest audio, so a slow machine updates less often but never falls behind.
 

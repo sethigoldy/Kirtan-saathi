@@ -23,6 +23,12 @@ export interface TrackerOptions {
   beta: number;
   /** Below this query self-score the audio is treated as non-verbal (hold). */
   minQuerySelf: number;
+  /**
+   * When no line explains at least this fraction of the recent audio, hold:
+   * instrumental passages decode as consonant soup that matches every line
+   * a little, and relative scores alone would move the display at random.
+   */
+  minEmission: number;
   /** Posterior needed to show a line from a blank display. */
   showPosterior: number;
   /** Posterior and margin needed to switch lines, held for `switchHops`. */
@@ -41,6 +47,7 @@ export const DEFAULT_TRACKER_OPTIONS: TrackerOptions = {
   other: 0.015,
   beta: 12,
   minQuerySelf: 3,
+  minEmission: 0.6,
   showPosterior: 0.5,
   switchPosterior: 0.55,
   switchMargin: 0.25,
@@ -153,6 +160,9 @@ export class LineTracker {
     // hits are in shabad order over singable lines, same order as this.lines.
     let bestE = -Infinity;
     for (const h of hits) if (h.score > bestE) bestE = h.score;
+    if (bestE < o.minEmission) {
+      return { line: this.displayedLine, posterior: this.displayed === null ? 0 : this.belief[this.displayed], bestEmission: bestE, held: true };
+    }
 
     // Predict.
     const prior = new Float64Array(n);
