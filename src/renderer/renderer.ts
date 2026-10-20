@@ -4,6 +4,35 @@
  * Gurbani for the line the engine reports. Raw ASR text is debug-only.
  */
 import type { FromEngine, ToEngine, UiCandidate, UiEvent, UiShabad } from '../main/protocol';
+import type { DisplayView, PresentationSettings } from '../main/display-types';
+
+interface PresentStatus {
+  projector: {
+    enabled: boolean;
+    displayId: number | null;
+    showing: boolean;
+    targetId: number | null;
+    displays: { id: number; label: string; primary: boolean; width: number; height: number }[];
+  };
+  server: { port: number; lan: boolean; urls: { projector: string; overlay: string; follow: string; lanFollow: string[] } };
+}
+
+/** Exposed by preload.ts. */
+declare global {
+  interface Window {
+    presentation: {
+      init(): Promise<{ view: DisplayView; status: PresentStatus }>;
+      setSettings(patch: Partial<PresentationSettings>): Promise<PresentationSettings>;
+      control(action: 'blank' | 'unblank' | 'next' | 'prev'): Promise<void>;
+      setProjector(p: { enabled: boolean; displayId: number | null }): Promise<void>;
+      setLan(lan: boolean): Promise<void>;
+      copy(text: string): Promise<void>;
+      open(url: string): Promise<void>;
+      onView(fn: (v: DisplayView) => void): void;
+      onStatus(fn: (s: PresentStatus) => void): void;
+    };
+  }
+}
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -17,6 +46,8 @@ let currentLine: number | null = null;
 let capture: { stop: () => void } | null = null;
 let mode: 'kirtan' | 'paath' | 'bani' = 'kirtan';
 let streamName: string | null = null;
+let view: DisplayView | null = null;
+let status: PresentStatus | null = null;
 
 /**
  * Audio is sent by copy: ArrayBuffer transfer does not survive the hop into
@@ -32,8 +63,9 @@ function renderTuk(el: HTMLElement, text: string): void {
   for (const word of text.split(/\s+/)) {
     if (!word) continue;
     const span = document.createElement('span');
-    if (word.endsWith(';')) span.className = 'v-major';
-    else if (word.endsWith('.')) span.className = 'v-minor';
+    if (word.endsWith(';')) span.className = 'v-main';
+    else if (word.endsWith(',')) span.className = 'v-medium';
+    else if (word.endsWith('.')) span.className = 'v-short';
     span.textContent = word.replace(/[;.,]$/, '');
     el.append(span, ' ');
   }
@@ -70,26 +102,15 @@ function highlight(): void {
     li.classList.toggle('current', on);
     if (on) li.scrollIntoView({ block: 'nearest' });
   }
-  const now = $('now');
-  const idx = shabad ? shabad.lines.findIndex((l) => l.line === currentLine) : -1;
-  const line = idx >= 0 ? shabad!.lines[idx] : undefined;
-  if (line) {
-    now.classList.remove('empty');
-    renderTuk($('now-line'), line.text);
-    // Paath moves quickly: preview the next line.
-    const next = mode !== 'kirtan' ? shabad!.lines[idx + 1] : undefined;
-    if (next) renderTuk($('next-line'), next.text);
-    else $('next-line').textContent = '';
-    const s = shabad!;
-    $('now-meta').textContent = [streamName && streamName !== s.source ? streamName : '', s.source, s.section, s.author, s.page > 0 ? `page ${s.page}` : '']
-      .filter(Boolean)
-      .join(' · ');
-  } else {
-    now.classList.add('empty');
-    $('now-line').textContent = 'ਉਡੀਕ…';
-    $('next-line').textContent = '';
-    $('now-meta').textContent = shabad ? 'Locked — waiting for a confident line' : 'Listening for Gurbani';
-  }
+  const s = shabad;
+  const shown = s && currentLine !== null && s.lines.some((l) => l.line === currentLine);
+  $('now-meta').textContent = shown
+    ? [streamName && streamName !== s!.source ? streamName : '', s!.source, s!.section, s!.author, s!.page > 0 ? `page ${s!.page}` : '']
+        .filter(Boolean)
+        .join(' · ')
+    : s
+      ? 'Locked — waiting for a confident line'
+      : 'Listening for Gurbani';
 }
 
 function renderCandidates(el: HTMLOListElement, items: UiCandidate[], emptyText: string): void {
@@ -280,6 +301,23 @@ async function startFile(file: File): Promise<void> {
   capture = { stop };
 }
 
+/** Plain-language help for the common microphone failures. */
+function micHelp(err: Error): string {
+  const mac = navigator.userAgent.includes('Mac');
+  if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+    return mac
+      ? 'Kirtan Saathi is not allowed to use the microphone. Open System Settings → Privacy & Security → Microphone, turn on Kirtan Saathi, then restart the app.'
+      : 'Kirtan Saathi is not allowed to use the microphone. Open Settings → Privacy & security → Microphone, turn on "Microphone access" and "Let desktop apps access your microphone", then try again.';
+  }
+  if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
+    return 'No microphone was found. Plug in a microphone or the mixer\'s USB / line input, choose it in the input list, then press Start listening.';
+  }
+  if (err.name === 'NotReadableError') {
+    return 'The microphone is busy or was unplugged. Close other apps using it (Zoom, Skype, OBS audio capture) and try again.';
+  }
+  return `Microphone unavailable: ${err.message}`;
+}
+
 function stopCapture(): void {
   capture?.stop();
   capture = null;
@@ -314,7 +352,7 @@ $('mic').addEventListener('click', async () => {
     await startMic();
     $('mic').textContent = 'Stop';
   } catch (err) {
-    onEngine({ type: 'error', message: `Microphone unavailable: ${(err as Error).message}` });
+    onEngine({ type: 'error', message: micHelp(err as Error) });
   }
 });
 
@@ -342,6 +380,122 @@ $('search-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const q = $<HTMLInputElement>('search').value.trim();
   if (q) send({ type: 'search', query: q });
+});
+
+// ---------- Presentation: projector, overlay, phones ----------
+
+const P = window.presentation;
+
+function renderView(v: DisplayView): void {
+  view = v;
+  $('blank').classList.toggle('on', v.blank);
+  $('blank').textContent = v.blank ? 'Show again' : 'Blank';
+  $('blank-badge').hidden = !v.blank;
+  const st = v.settings;
+  $<HTMLInputElement>('font-scale').value = String(st.fontScale);
+  $<HTMLSelectElement>('theme').value = st.theme;
+  $<HTMLInputElement>('opt-vishraam').checked = st.vishraam;
+  $<HTMLInputElement>('opt-larivaar').checked = st.larivaar;
+  $<HTMLInputElement>('opt-next').checked = st.nextLine;
+  $<HTMLInputElement>('opt-source').checked = st.showSource;
+}
+
+function renderStatus(s: PresentStatus): void {
+  const first = !status || status.server.port !== s.server.port;
+  status = s;
+  const preview = $<HTMLIFrameElement>('preview');
+  if (first) preview.src = s.server.urls.projector;
+  const sel = $<HTMLSelectElement>('proj-display');
+  sel.textContent = '';
+  const auto = document.createElement('option');
+  auto.value = '';
+  auto.textContent = 'Second screen (automatic)';
+  sel.append(auto);
+  for (const d of s.projector.displays) {
+    const o = document.createElement('option');
+    o.value = String(d.id);
+    o.textContent = `${d.label} — ${d.width}×${d.height}${d.primary ? ' (this screen)' : ''}`;
+    sel.append(o);
+  }
+  sel.value = s.projector.displayId === null ? '' : String(s.projector.displayId);
+  const p = s.projector;
+  $('proj-toggle').textContent = p.enabled ? 'Hide' : 'Show';
+  $('proj-toggle').classList.toggle('primary', !p.enabled);
+  const target = p.displays.find((d) => d.id === p.targetId);
+  $('proj-status').textContent = p.enabled
+    ? p.showing && target
+      ? `Showing on ${target.label}${target.primary ? '. Press Esc on the projector to close it.' : '.'}`
+      : 'Waiting for the chosen screen to be connected.'
+    : p.displays.length > 1
+      ? 'Projector is off.'
+      : 'Only one screen is connected. Connect the projector, or show it here (Esc closes it).';
+  $('url-overlay').textContent = s.server.urls.overlay;
+  $<HTMLInputElement>('opt-lan').checked = s.server.lan;
+  const lan = $('lan-urls');
+  lan.textContent = '';
+  if (s.server.lan) {
+    if (!s.server.urls.lanFollow.length) {
+      lan.textContent = 'No Wi-Fi or network connection found on this computer.';
+    }
+    for (const url of s.server.urls.lanFollow) {
+      const row = document.createElement('div');
+      row.className = 'url-row';
+      const code = document.createElement('code');
+      code.textContent = url;
+      const b = document.createElement('button');
+      b.textContent = 'Copy';
+      b.addEventListener('click', () => void P.copy(url));
+      row.append(code, b);
+      lan.append(row);
+    }
+    const note = document.createElement('p');
+    note.className = 'muted';
+    note.textContent = 'Phones must be on the same Wi-Fi. Open this address in the phone browser.';
+    lan.append(note);
+  }
+}
+
+function setting(patch: Partial<PresentationSettings>): void {
+  void P.setSettings(patch);
+}
+
+$('proj-toggle').addEventListener('click', () => {
+  const v = $<HTMLSelectElement>('proj-display').value;
+  void P.setProjector({ enabled: !status?.projector.enabled, displayId: v === '' ? null : Number(v) });
+});
+$('proj-display').addEventListener('change', (e) => {
+  const v = (e.target as HTMLSelectElement).value;
+  void P.setProjector({ enabled: !!status?.projector.enabled, displayId: v === '' ? null : Number(v) });
+});
+$('font-scale').addEventListener('input', (e) => setting({ fontScale: Number((e.target as HTMLInputElement).value) }));
+$('theme').addEventListener('change', (e) => setting({ theme: (e.target as HTMLSelectElement).value as PresentationSettings['theme'] }));
+$('opt-vishraam').addEventListener('change', (e) => setting({ vishraam: (e.target as HTMLInputElement).checked }));
+$('opt-larivaar').addEventListener('change', (e) => setting({ larivaar: (e.target as HTMLInputElement).checked }));
+$('opt-next').addEventListener('change', (e) => setting({ nextLine: (e.target as HTMLInputElement).checked }));
+$('opt-source').addEventListener('change', (e) => setting({ showSource: (e.target as HTMLInputElement).checked }));
+$('opt-lan').addEventListener('change', (e) => void P.setLan((e.target as HTMLInputElement).checked));
+$('blank').addEventListener('click', () => void P.control(view?.blank ? 'unblank' : 'blank'));
+$('prev').addEventListener('click', () => void P.control('prev'));
+$('next').addEventListener('click', () => void P.control('next'));
+for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-copy]'))) {
+  b.addEventListener('click', () => void P.copy($(b.dataset.copy!).textContent ?? ''));
+}
+
+window.addEventListener('keydown', (e) => {
+  const t = e.target as HTMLElement;
+  if (t.closest('input:not([type=checkbox]):not([type=range]), select, textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'ArrowRight') void P.control('next');
+  else if (e.key === 'ArrowLeft') void P.control('prev');
+  else if (e.key === 'b' || e.key === 'B') void P.control(view?.blank ? 'unblank' : 'blank');
+  else return;
+  e.preventDefault();
+});
+
+P.onView(renderView);
+P.onStatus(renderStatus);
+void P.init().then(({ view: v, status: s }) => {
+  renderView(v);
+  renderStatus(s);
 });
 
 void listDevices();

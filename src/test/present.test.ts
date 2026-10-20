@@ -1,0 +1,166 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { request } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DisplayState, type DisplayReport, type DisplayView } from '../main/display-state';
+import { controlAllowed, PresentationServer, type ControlAction } from '../main/server';
+import { parseSettings, SettingsStore } from '../main/settings';
+import { plainText, tokens } from '../present/format';
+
+const SHABAD = {
+  index: 7,
+  source: 'Sri Guru Granth Sahib',
+  section: 'Raag Sorath',
+  author: 'Guru Arjan Dev Ji',
+  page: 628,
+  lines: [
+    { line: 100, text: 'ਸੋਰਠਿ ਮਹਲਾ ੫ ॥', role: 2 },
+    { line: 101, text: 'ਗੁਰਿ ਪੂਰੈ; ਕਿਰਪਾ ਧਾਰੀ ॥', role: 0 },
+    { line: 102, text: 'ਪ੍ਰਭਿ ਪੂਰੀ, ਲੋਚ ਹਮਾਰੀ ॥', role: 0 },
+  ],
+};
+
+function report(line: number | null, mode: DisplayReport['mode'] = 'kirtan'): DisplayReport {
+  return { mode, stream: null, shabad: SHABAD, line, next: null };
+}
+
+test('vishraam markers become pause levels and are removed from the text', () => {
+  const t = tokens('ਗੁਰਿ ਪੂਰੈ; ਕਿਰਪਾ, ਧਾਰੀ. ॥ ੧ ॥', { larivaar: false, vishraam: true });
+  assert.deepEqual(
+    t.map((x) => [x.text, x.pause]),
+    [['ਗੁਰਿ', null], ['ਪੂਰੈ', 'main'], ['ਕਿਰਪਾ', 'medium'], ['ਧਾਰੀ', 'short'], ['॥', null], ['੧', null], ['॥', null]],
+  );
+  assert.equal(tokens('ਗੁਰਿ ਪੂਰੈ;', { larivaar: false, vishraam: false })[1].pause, null);
+});
+
+test('larivaar joins words but keeps ॥ and verse numbers apart', () => {
+  assert.equal(plainText('ਗੁਰਿ ਪੂਰੈ; ਕਿਰਪਾ ਧਾਰੀ ॥ ੧ ॥', { larivaar: true }), 'ਗੁਰਿਪੂਰੈਕਿਰਪਾਧਾਰੀ ॥ ੧ ॥');
+  assert.equal(plainText('ਗੁਰਿ ਪੂਰੈ; ਕਿਰਪਾ ਧਾਰੀ ॥', { larivaar: false }), 'ਗੁਰਿ ਪੂਰੈ ਕਿਰਪਾ ਧਾਰੀ ॥');
+});
+
+test('display state emits only on real changes and hides next in kirtan', () => {
+  const d = new DisplayState();
+  const seen: DisplayView[] = [];
+  d.on('change', (v) => seen.push(v));
+  d.update(report(101));
+  d.update(report(101)); // unchanged
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].current?.line, 101);
+  assert.equal(seen[0].next, null, 'kirtan never previews a next line');
+  assert.match(seen[0].source, /Raag Sorath · Guru Arjan Dev Ji · page 628/);
+
+  d.update(report(101, 'paath'));
+  assert.equal(seen.at(-1)!.next?.line, 102, 'paath falls back to the next line in the shabad');
+
+  d.setBlank(true);
+  d.setBlank(true);
+  assert.equal(seen.length, 3);
+  assert.equal(seen.at(-1)!.blank, true);
+
+  const s = d.updateSettings({ fontScale: 9, theme: 'nope' as never });
+  assert.equal(s.fontScale, 2.5);
+  assert.equal(s.theme, 'dark');
+});
+
+test('control is open on loopback, PIN-gated on the LAN', () => {
+  assert.equal(controlAllowed('127.0.0.1', { lan: false, pin: '1234' }, undefined), true);
+  assert.equal(controlAllowed('::ffff:127.0.0.1', { lan: true, pin: '1234' }, undefined), true);
+  assert.equal(controlAllowed('192.168.1.20', { lan: false, pin: '1234' }, '1234'), false);
+  assert.equal(controlAllowed('192.168.1.20', { lan: true, pin: '1234' }, '0000'), false);
+  assert.equal(controlAllowed('192.168.1.20', { lan: true, pin: '1234' }, '1234'), true);
+});
+
+function http(port: number, method: string, path: string, body?: string): Promise<{ status: number; type: string; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port, method, path, headers: body ? { 'Content-Type': 'application/json' } : {} }, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, type: String(res.headers['content-type'] ?? ''), body: data }));
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+/** Read SSE frames until `count` data frames arrive. */
+function events(port: number, count: number, onOpen: () => void): Promise<DisplayView[]> {
+  return new Promise((resolve, reject) => {
+    const got: DisplayView[] = [];
+    const req = request({ host: '127.0.0.1', port, path: '/events' }, (res) => {
+      let buf = '';
+      res.on('data', (c) => {
+        buf += c;
+        let i: number;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, i);
+          buf = buf.slice(i + 2);
+          if (frame.startsWith('data: ')) got.push(JSON.parse(frame.slice(6)));
+          if (got.length === 1 && frame.startsWith('data: ')) onOpen();
+          if (got.length >= count) {
+            req.destroy();
+            resolve(got);
+            return;
+          }
+        }
+      });
+    });
+    req.on('error', (e) => (got.length >= count ? undefined : reject(e)));
+    req.end();
+  });
+}
+
+test('presentation server: pages, state, live events and control', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ks-static-'));
+  mkdirSync(join(dir, 'present'));
+  writeFileSync(join(dir, 'present', 'index.html'), '<!doctype html><title>t</title>');
+  writeFileSync(join(dir, 'present', 'present.js'), 'export {};');
+  const display = new DisplayState();
+  const actions: ControlAction[] = [];
+  const server = new PresentationServer(display, { port: 0, lan: false, pin: '1234', staticDir: dir }, (a) => actions.push(a));
+  const port = await server.start();
+  try {
+    for (const page of ['/projector', '/overlay', '/follow']) {
+      const r = await http(port, 'GET', page);
+      assert.equal(r.status, 200, page);
+      assert.match(r.type, /text\/html/);
+    }
+    assert.match((await http(port, 'GET', '/present/present.js')).type, /javascript/);
+    assert.equal((await http(port, 'GET', '/present/../../etc/passwd')).status, 404);
+    assert.equal((await http(port, 'GET', '/nope')).status, 404);
+
+    const live = events(port, 2, () => display.update(report(102)));
+    const [first, second] = await live;
+    assert.equal(first.current, null);
+    assert.equal(second.current?.line, 102);
+
+    const state = JSON.parse((await http(port, 'GET', '/api/state')).body) as DisplayView;
+    assert.equal(state.current?.line, 102);
+
+    assert.equal((await http(port, 'POST', '/api/control', JSON.stringify({ action: 'next' }))).status, 200);
+    assert.equal((await http(port, 'POST', '/api/control', JSON.stringify({ action: 'rm -rf' }))).status, 400);
+    assert.equal((await http(port, 'POST', '/api/control', '{bad')).status, 400);
+    assert.deepEqual(actions, ['next']);
+    assert.equal(server.urls().lanFollow.length, 0, 'no LAN addresses unless LAN mode is on');
+  } finally {
+    await server.stop();
+  }
+});
+
+test('settings survive a damaged file and keep valid values', () => {
+  const s = parseSettings({ server: { port: 80, lan: 'yes', pin: 'abc' }, projector: { enabled: true, displayId: 42 } });
+  assert.equal(s.server.port, 7531, 'privileged port rejected');
+  assert.equal(s.server.lan, false);
+  assert.match(s.server.pin, /^\d{4}$/);
+  assert.deepEqual(s.projector, { enabled: true, displayId: 42 });
+
+  const dir = mkdtempSync(join(tmpdir(), 'ks-settings-'));
+  const file = join(dir, 'settings.json');
+  writeFileSync(file, '{ not json');
+  const store = new SettingsStore(file);
+  store.update((x) => (x.presentation.larivaar = true));
+  store.flush();
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).presentation.larivaar, true);
+  assert.equal(new SettingsStore(file).get().presentation.larivaar, true);
+});

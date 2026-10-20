@@ -11,6 +11,10 @@ for (const f of readdirSync('static')) {
 }
 copyFileSync('static/index.html', 'dist/renderer/index.html');
 copyFileSync('dist/renderer-build/renderer/renderer.js', 'dist/renderer/renderer.js');
+// Presentation page (projector, overlay, follow), served by the local server.
+for (const f of ['present.js', 'format.js']) {
+  copyFileSync(join('dist/renderer-build/present', f), join('dist/static/present', f));
+}
 
 // Noto Sans Gurmukhi (SIL OFL 1.1), bundled so the app renders offline.
 const fontDir = 'node_modules/@fontsource/noto-sans-gurmukhi/files';

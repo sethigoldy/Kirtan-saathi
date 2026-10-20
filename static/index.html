@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; media-src 'self' blob:; script-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; media-src 'self' blob:; script-src 'self'; frame-src http://127.0.0.1:*" />
   <title>Kirtan Saathi</title>
   <link rel="stylesheet" href="../static/styles.css" />
 </head>
 <body>
   <header class="bar">
-    <div class="brand">Kirtan Saathi <span class="phase">Phase 2</span></div>
+    <div class="brand">Kirtan Saathi</div>
     <div id="status" class="pill pill-idle">Starting engine…</div>
     <div class="controls">
       <select id="mode" title="What is being recited">
@@ -28,15 +28,52 @@
 
   <main>
     <section class="stage">
-      <div id="now" class="now empty">
-        <div id="now-line" class="tuk">ਉਡੀਕ…</div>
-        <div id="next-line" class="next"></div>
-        <div id="now-meta" class="meta">Listening for Gurbani</div>
+      <div class="screen">
+        <div class="preview-wrap" title="What the sangat sees">
+          <iframe id="preview" tabindex="-1" title="Projector preview"></iframe>
+          <div id="blank-badge" class="badge" hidden>Screen blanked</div>
+        </div>
+        <div class="screen-side">
+          <div id="now-meta" class="meta">Listening for Gurbani</div>
+          <div class="screen-buttons">
+            <button id="prev" title="Previous line (Left arrow)">◀ Previous</button>
+            <button id="blank" title="Blank the screen (B)">Blank</button>
+            <button id="next" title="Next line (Right arrow)">Next ▶</button>
+          </div>
+          <p class="hint">Click a line below to show it. Keys: ← → move, B blanks.</p>
+        </div>
       </div>
       <ol id="lines" class="lines"></ol>
     </section>
 
     <aside class="side">
+      <section>
+        <h2>Projector</h2>
+        <div class="field-row">
+          <select id="proj-display" title="Screen for the sangat"></select>
+          <button id="proj-toggle">Show</button>
+        </div>
+        <p id="proj-status" class="small muted"></p>
+        <label class="field">Text size <input id="font-scale" type="range" min="0.5" max="2.5" step="0.05" /></label>
+        <label class="field">Colours
+          <select id="theme">
+            <option value="dark">Dark</option>
+            <option value="saffron">Blue and saffron</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="opt-vishraam" /> Vishraam colours</label>
+        <label class="check"><input type="checkbox" id="opt-larivaar" /> Larivaar (joined words)</label>
+        <label class="check"><input type="checkbox" id="opt-next" /> Next line (paath and banis)</label>
+        <label class="check"><input type="checkbox" id="opt-source" /> Source and page</label>
+      </section>
+      <section>
+        <h2>Livestream and phones</h2>
+        <p class="small muted">OBS: add a <em>Browser</em> source with this address, 1920 × 1080.</p>
+        <div class="url-row"><code id="url-overlay"></code><button data-copy="url-overlay">Copy</button></div>
+        <label class="check"><input type="checkbox" id="opt-lan" /> Let phones on this Wi-Fi follow along</label>
+        <div id="lan-urls" class="small"></div>
+      </section>
       <section>
         <h2>Candidates</h2>
         <ol id="candidates" class="candidates"><li class="muted">No candidates yet</li></ol>

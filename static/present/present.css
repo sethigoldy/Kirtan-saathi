@@ -1,0 +1,190 @@
+@font-face {
+  font-family: 'Noto Sans Gurmukhi';
+  src: url('/fonts/noto-sans-gurmukhi-gurmukhi-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Noto Sans Gurmukhi';
+  src: url('/fonts/noto-sans-gurmukhi-gurmukhi-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-display: block;
+}
+
+/* Themes: projector and follow pages. The overlay has its own colours. */
+:root, :root[data-theme='dark'] {
+  --bg: #0b0908;
+  --fg: #f6efe4;
+  --muted: #a39887;
+  --next: #c9bfae;
+  --v-main: #ff8f4a;
+  --v-medium: #f2c14e;
+  --v-short: #8fd49a;
+  --rahao: #ffd28a;
+  --current-bg: rgba(255, 196, 92, 0.14);
+  --rule: rgba(255, 255, 255, 0.08);
+}
+:root[data-theme='light'] {
+  --bg: #fbf8f1;
+  --fg: #17130f;
+  --muted: #6f6556;
+  --next: #4a4136;
+  --v-main: #c2410c;
+  --v-medium: #a16207;
+  --v-short: #15803d;
+  --rahao: #9a3412;
+  --current-bg: rgba(234, 160, 40, 0.18);
+  --rule: rgba(0, 0, 0, 0.08);
+}
+:root[data-theme='saffron'] {
+  --bg: #0f1d45;
+  --fg: #ffffff;
+  --muted: #b9c3e6;
+  --next: #d7defa;
+  --v-main: #ffa22e;
+  --v-medium: #ffd166;
+  --v-short: #9ee6a8;
+  --rahao: #ffbf5e;
+  --current-bg: rgba(255, 162, 46, 0.2);
+  --rule: rgba(255, 255, 255, 0.1);
+}
+
+:root {
+  --gurmukhi: 'Noto Sans Gurmukhi', 'Gurmukhi MN', 'Raavi', sans-serif;
+  --scale: 1;
+  --follow-scale: 1;
+  --overlay-size: 1;
+  --overlay-fg: #ffffff;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; }
+
+.v-main { color: var(--v-main); }
+.v-medium { color: var(--v-medium); }
+.v-short { color: var(--v-short); }
+
+/* Layout switching */
+:root[data-layout='follow'] .stage { display: none; }
+:root:not([data-layout='follow']) .follow { display: none; }
+
+/* ---------- Projector ---------- */
+:root[data-layout='projector'] body { overflow: hidden; cursor: none; }
+.stage {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4vh 5vw;
+  transition: opacity 0.25s ease;
+}
+.stage .box { text-align: center; }
+.tuk {
+  font-family: var(--gurmukhi);
+  font-weight: 600;
+  font-size: calc(var(--scale) * 5.4vw);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.tuk.rahao { color: var(--rahao); }
+.tuk.enter { animation: enter 0.22s ease-out; }
+@keyframes enter { from { opacity: 0.25; } to { opacity: 1; } }
+.next {
+  font-family: var(--gurmukhi);
+  font-size: calc(var(--scale) * 3vw);
+  line-height: 1.45;
+  color: var(--next);
+  margin-top: 3.5vh;
+  opacity: 0.85;
+}
+.next:empty { display: none; }
+.source {
+  margin-top: 4vh;
+  font-size: calc(var(--scale) * 1.25vw);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+.source:empty { display: none; }
+:root.blank .stage { opacity: 0; }
+.stage.empty .box { opacity: 0; }
+
+/* ---------- OBS overlay (transparent page, lower third) ---------- */
+:root[data-layout='overlay'],
+:root[data-layout='overlay'] body { background: transparent; }
+:root[data-layout='overlay'] .stage { justify-content: flex-end; padding: 0 4vw 5vh; }
+:root[data-layout='overlay'][data-position='top'] .stage { justify-content: flex-start; padding: 5vh 4vw 0; }
+:root[data-layout='overlay'][data-position='center'] .stage { justify-content: center; }
+:root[data-layout='overlay'] .box {
+  align-self: center;
+  max-width: 92vw;
+  padding: 1.6vh 2.4vw;
+  border-radius: 1.2vh;
+  background: rgba(8, 8, 12, 0.72);
+  color: var(--overlay-fg);
+}
+:root[data-layout='overlay'][data-box='off'] .box {
+  background: transparent;
+  text-shadow: 0 0 0.35em rgba(0, 0, 0, 0.95), 0 0.06em 0.12em rgba(0, 0, 0, 0.9);
+}
+:root[data-layout='overlay'] .tuk { font-size: calc(var(--overlay-size) * var(--scale) * 3.6vw); color: var(--overlay-fg); }
+:root[data-layout='overlay'] .tuk.rahao { color: var(--overlay-fg); }
+:root[data-layout='overlay'] .next { font-size: calc(var(--overlay-size) * var(--scale) * 2.1vw); color: var(--overlay-fg); opacity: 0.75; margin-top: 0.8vh; }
+:root[data-layout='overlay'] .source { font-size: calc(var(--overlay-size) * 1vw); color: var(--overlay-fg); opacity: 0.7; margin-top: 0.8vh; }
+:root[data-layout='overlay'] .v-main { color: #ffb06b; }
+:root[data-layout='overlay'] .v-medium { color: #ffd77a; }
+:root[data-layout='overlay'] .v-short { color: #a8e6b2; }
+
+/* ---------- Follow (phone / tablet) ---------- */
+.follow { min-height: 100vh; padding-bottom: 6rem; }
+.follow-bar {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule);
+}
+.follow-title { display: flex; flex-direction: column; min-width: 0; }
+.follow-title strong { font-size: 0.95rem; }
+.follow-title span { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.follow-tools { display: flex; gap: 8px; flex: none; }
+.follow-tools button {
+  min-width: 44px; min-height: 44px; border-radius: 10px;
+  border: 1px solid var(--rule); background: transparent; color: var(--fg);
+}
+.follow-lines {
+  list-style: none; margin: 0; padding: 12px 16px;
+  font-family: var(--gurmukhi);
+  font-size: calc(var(--follow-scale) * 1.45rem);
+  line-height: 1.6;
+}
+.follow-lines li {
+  padding: 10px 12px; margin: 2px -12px; border-radius: 10px;
+  transition: background-color 0.2s ease;
+}
+.follow-lines li.header { color: var(--muted); font-size: 0.8em; }
+.follow-lines li.rahao { color: var(--rahao); }
+.follow-lines li.current { background: var(--current-bg); font-weight: 600; }
+.live {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: max(16px, env(safe-area-inset-bottom));
+  padding: 12px 20px; border-radius: 999px; border: 0;
+  background: var(--v-main); color: #1a1206; font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+:root.blank .follow-lines li.current { background: transparent; font-weight: 400; }
+
+/* Connection lost: projector stays clean; follow shows a note. */
+.offline-note {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0;
+  padding: 8px 16px; text-align: center; font-size: 0.85rem;
+  background: #7a2e1c; color: #fff;
+}
+:root[data-layout='follow'].offline .offline-note { display: block; }

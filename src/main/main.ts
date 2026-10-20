@@ -1,16 +1,43 @@
 /**
- * Electron main process: one operator window, one engine utility process,
- * and a direct MessagePort between them so audio never passes through main.
+ * Electron main process: the operator window, the engine utility process
+ * (a direct MessagePort carries audio from the renderer to it), the display
+ * state every output renders, the local presentation server, and the
+ * projector window.
  */
-import { app, BrowserWindow, MessageChannelMain, session, systemPreferences, utilityProcess, type UtilityProcess } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  ipcMain,
+  MessageChannelMain,
+  session,
+  shell,
+  systemPreferences,
+  utilityProcess,
+  type UtilityProcess,
+} from 'electron';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { DisplayState, type DisplayReport, type PresentationSettings } from './display-state';
+import { Projector } from './projector';
+import { PresentationServer, type ControlAction } from './server';
+import { SettingsStore } from './settings';
+import type { ToEngine } from './protocol';
 
 let win: BrowserWindow | null = null;
 let engine: UtilityProcess | null = null;
 let engineStarted = false;
+let settings: SettingsStore;
+let display: DisplayState;
+let server: PresentationServer;
+let projector: Projector;
+
+function appBase(): string {
+  return app.isPackaged ? process.resourcesPath : app.getAppPath();
+}
 
 function resourcePaths(): { models: string; corpus: string } {
-  const base = app.isPackaged ? process.resourcesPath : app.getAppPath();
+  const base = appBase();
   return { models: join(base, 'models'), corpus: join(base, 'resources', 'corpus.json.gz') };
 }
 
@@ -21,12 +48,20 @@ function startEngine(): UtilityProcess {
   });
   child.stdout?.on('data', (d) => process.stdout.write(`[engine] ${d}`));
   child.stderr?.on('data', (d) => process.stderr.write(`[engine] ${d}`));
+  child.on('message', (m: { type?: string; report?: DisplayReport }) => {
+    if (m?.type === 'display' && m.report) display.update(m.report);
+  });
   child.on('exit', (code) => {
     console.error(`engine exited with code ${code}`);
     engine = null;
     engineStarted = false;
   });
   return child;
+}
+
+/** Commands from the presentation server or operator controls, not the renderer port. */
+function toEngine(msg: ToEngine): void {
+  engine?.postMessage({ type: 'cmd', msg });
 }
 
 /** Give the renderer a fresh port to the engine (on every page load). */
@@ -43,35 +78,91 @@ function connect(): void {
   win.webContents.postMessage('engine-port', null, [port1]);
 }
 
+function presentStatus() {
+  const s = settings.get();
+  return {
+    projector: projector.status(),
+    server: { port: server.port, lan: s.server.lan, urls: server.urls() },
+  };
+}
+
+function pushStatus(): void {
+  win?.webContents.send('present:status', presentStatus());
+}
+
+function control(action: ControlAction): void {
+  if (action === 'blank') display.setBlank(true);
+  else if (action === 'unblank') display.setBlank(false);
+  else toEngine({ type: 'step', offset: action === 'next' ? 1 : -1 });
+}
+
+function registerIpc(): void {
+  ipcMain.handle('present:init', () => ({ view: display.view(), status: presentStatus() }));
+  ipcMain.handle('present:settings', (_e, patch: Partial<PresentationSettings>) => {
+    const next = display.updateSettings(patch ?? {});
+    settings.update((s) => (s.presentation = next));
+    return next;
+  });
+  ipcMain.handle('present:control', (_e, action: ControlAction) => {
+    if (['blank', 'unblank', 'next', 'prev'].includes(action)) control(action);
+  });
+  ipcMain.handle('present:projector', (_e, p: { enabled: boolean; displayId: number | null }) => {
+    projector.set(!!p.enabled, typeof p.displayId === 'number' ? p.displayId : null);
+  });
+  ipcMain.handle('present:lan', async (_e, lan: boolean) => {
+    settings.update((s) => (s.server.lan = !!lan));
+    await server.reconfigure({ lan: !!lan });
+    projector.reload();
+    pushStatus();
+  });
+  ipcMain.handle('present:copy', (_e, text: string) => {
+    if (typeof text === 'string' && text.length < 500) clipboard.writeText(text);
+  });
+  ipcMain.handle('present:open', (_e, url: string) => {
+    // Only our own pages: the overlay / follow preview in the default browser.
+    if (typeof url === 'string' && url.startsWith(`http://127.0.0.1:${server.port}/`)) void shell.openExternal(url);
+  });
+}
+
 function createWindow(): void {
   win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 900,
-    minHeight: 600,
+    width: 1320,
+    height: 860,
+    minWidth: 960,
+    minHeight: 620,
     title: 'Kirtan Saathi',
     backgroundColor: '#14110f',
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
       sandbox: true,
-      // A projector or follow-along view must keep updating when unfocused.
+      // Keep decoding and the projector updating while the window is unfocused.
       backgroundThrottling: false,
     },
   });
   win.removeMenu();
-  win.webContents.on('did-finish-load', connect);
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('did-finish-load', () => {
+    connect();
+    pushStatus();
+  });
   void win.loadFile(join(__dirname, '..', 'renderer', 'index.html'));
   win.on('closed', () => {
     win = null;
+    // The operator window is the app: closing it closes the projector too
+    // (on macOS as well). The projector setting is kept for the next start.
+    app.quit();
   });
 }
 
 /**
- * Smoke test (development only): GURBANI_SMOKE=<16 kHz mono wav> streams the
- * file through the renderer at real-time pace, saves a screenshot to
- * GURBANI_SMOKE_SHOT (default smoke.png) after GURBANI_SMOKE_SECONDS, quits.
- * GURBANI_SMOKE_MODE selects the mode first (kirtan, paath, bani:<ID>).
+ * Smoke test (development and CI): GURBANI_SMOKE=<16 kHz mono wav> streams
+ * the file through the renderer at real-time pace, saves screenshots after
+ * GURBANI_SMOKE_SECONDS, then quits.
+ *   GURBANI_SMOKE_SHOT        operator screenshot (default smoke.png)
+ *   GURBANI_SMOKE_PROJECTOR   projector screenshot (opens the projector)
+ *   GURBANI_SMOKE_MODE        kirtan, paath or bani:<ID>
+ *   GURBANI_SMOKE_REPORT      JSON with the final display view
  */
 function smokeTest(): void {
   const file = process.env.GURBANI_SMOKE;
@@ -82,8 +173,11 @@ function smokeTest(): void {
   const offset = Math.round(Number(process.env.GURBANI_SMOKE_OFFSET ?? 0) * 16000);
   const seconds = Number(process.env.GURBANI_SMOKE_SECONDS ?? 60);
   const shot = process.env.GURBANI_SMOKE_SHOT ?? 'smoke.png';
+  const projShot = process.env.GURBANI_SMOKE_PROJECTOR;
+  const report = process.env.GURBANI_SMOKE_REPORT;
   const mode = process.env.GURBANI_SMOKE_MODE;
   if (mode) win.webContents.send('smoke-mode', mode);
+  if (projShot) projector.set(true, null);
   let pos = offset;
   const started = Date.now();
   const timer = setInterval(() => {
@@ -96,27 +190,69 @@ function smokeTest(): void {
   setTimeout(async () => {
     clearInterval(timer);
     const img = await win!.webContents.capturePage();
-    require('node:fs').writeFileSync(shot, img.toPNG());
-    console.log(`smoke: streamed ${((pos - offset) / 16000).toFixed(1)} s, screenshot ${shot}`);
-    app.quit();
+    writeFileSync(shot, img.toPNG());
+    const p = projector.capture();
+    if (projShot && p) writeFileSync(projShot, (await p).toPNG());
+    if (report) writeFileSync(report, JSON.stringify({ view: display.view(), urls: server.urls() }, null, 2));
+    const line = display.view().current?.text ?? '(no line)';
+    console.log(`smoke: streamed ${((pos - offset) / 16000).toFixed(1)} s, line: ${line}, screenshot ${shot}`);
+    app.exit(0);
   }, seconds * 1000);
 }
 
-app.whenReady().then(async () => {
-  // Microphone only; everything else is denied.
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'media'));
-  session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media');
-  if (process.platform === 'darwin') {
-    await systemPreferences.askForMediaAccess('microphone').catch(() => false);
-  }
-  createWindow();
-  if (process.env.GURBANI_SMOKE) win!.webContents.once('did-finish-load', () => setTimeout(smokeTest, 8000));
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+// One running copy: a second launch focuses the first window.
+if (!app.requestSingleInstanceLock() && !process.env.GURBANI_SMOKE) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
   });
-});
 
-app.on('window-all-closed', () => {
-  engine?.kill();
-  if (process.platform !== 'darwin') app.quit();
-});
+  app.whenReady().then(async () => {
+    // Microphone only, and only for the operator window's own page.
+    session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(permission === 'media' && wc === win?.webContents));
+    session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media');
+    if (process.platform === 'darwin') {
+      await systemPreferences.askForMediaAccess('microphone').catch(() => false);
+    }
+
+    settings = new SettingsStore(join(app.getPath('userData'), 'settings.json'));
+    const s = settings.get();
+    display = new DisplayState(s.presentation);
+    server = new PresentationServer(
+      display,
+      { port: s.server.port, lan: s.server.lan, pin: s.server.pin, staticDir: join(__dirname, '..', 'static') },
+      control,
+    );
+    await server.start();
+    projector = new Projector(
+      () => `http://127.0.0.1:${server.port}/projector`,
+      () => display.settings.theme,
+    );
+    projector.on('status', (st: ReturnType<Projector['status']>) => {
+      settings.update((x) => {
+        x.projector.enabled = st.enabled;
+        x.projector.displayId = st.displayId;
+      });
+      pushStatus();
+    });
+    display.on('change', (view) => win?.webContents.send('present:view', view));
+    registerIpc();
+
+    createWindow();
+    if (s.projector.enabled && !process.env.GURBANI_SMOKE) projector.set(true, s.projector.displayId);
+    if (process.env.GURBANI_SMOKE) win!.webContents.once('did-finish-load', () => setTimeout(smokeTest, 8000));
+  });
+
+  app.on('window-all-closed', () => app.quit());
+
+  app.on('before-quit', () => {
+    engine?.kill();
+    settings?.flush();
+    projector?.dispose();
+    void server?.stop();
+  });
+}

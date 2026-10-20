@@ -9,6 +9,7 @@ export type ToEngine =
   | { type: 'mode'; mode: EngineMode }
   | { type: 'lock'; shabad: number; line?: number | null }
   | { type: 'setLine'; line: number }
+  | { type: 'step'; offset: number }
   | { type: 'reset' }
   | { type: 'search'; query: string };
 
