@@ -1,0 +1,8 @@
+node_modules/
+dist/
+models/
+assets/
+.cache/
+bench-out/
+*.log
+smoke.png

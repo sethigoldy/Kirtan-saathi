@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; media-src 'self' blob:; script-src 'self'" />
+  <title>Gurbani Live</title>
+  <link rel="stylesheet" href="../static/styles.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">Gurbani Live <span class="phase">Phase 1</span></div>
+    <div id="status" class="pill pill-idle">Starting engine…</div>
+    <div class="controls">
+      <select id="device" title="Input device"></select>
+      <button id="mic" class="primary" disabled>Start listening</button>
+      <label class="button" title="Play a recording and follow it">
+        Test with a file<input id="file" type="file" accept="audio/*,video/webm" hidden />
+      </label>
+      <button id="reset" title="Clear the lock and search again">Reset</button>
+      <div class="meter" title="Input level"><div id="level"></div></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div id="now" class="now empty">
+        <div id="now-line" class="tuk">ਉਡੀਕ…</div>
+        <div id="now-meta" class="meta">Listening for Gurbani</div>
+      </div>
+      <ol id="lines" class="lines"></ol>
+    </section>
+
+    <aside class="side">
+      <section>
+        <h2>Candidates</h2>
+        <ol id="candidates" class="candidates"><li class="muted">No candidates yet</li></ol>
+      </section>
+      <section>
+        <h2>Find a shabad</h2>
+        <form id="search-form"><input id="search" placeholder="Type Gurmukhi, e.g. ਪੋਥੀ ਪਰਮੇਸਰ" autocomplete="off" /></form>
+        <ol id="results" class="candidates"></ol>
+      </section>
+      <section>
+        <h2>Engine</h2>
+        <dl id="stats" class="stats"></dl>
+        <details>
+          <summary>Raw recognizer output (debug, never shown to sangat)</summary>
+          <p id="asr" class="asr"></p>
+        </details>
+      </section>
+    </aside>
+  </main>
+  <footer id="error" class="error" hidden></footer>
+  <script type="module" src="./renderer.js"></script>
+</body>
+</html>

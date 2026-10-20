@@ -1,0 +1,98 @@
+@font-face {
+  font-family: 'Noto Sans Gurmukhi';
+  src: url('./fonts/noto-sans-gurmukhi-gurmukhi-400-normal.woff2') format('woff2');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Noto Sans Gurmukhi';
+  src: url('./fonts/noto-sans-gurmukhi-gurmukhi-600-normal.woff2') format('woff2');
+  font-weight: 600;
+}
+
+:root {
+  --bg: #14110f;
+  --panel: #1d1916;
+  --line: #2d2723;
+  --text: #f1e9df;
+  --muted: #9a8f84;
+  --accent: #e8a33d;
+  --accent-ink: #1a1206;
+  --ok: #7fb685;
+  --warn: #d9a441;
+  --bad: #d0675b;
+  --gurmukhi: 'Noto Sans Gurmukhi', 'Gurmukhi MN', 'Raavi', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.bar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.brand { font-weight: 600; letter-spacing: .02em; }
+.phase { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+.controls { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+button, .button, select, input {
+  font: inherit; color: var(--text); background: #2a2420; border: 1px solid #3a322c;
+  border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+select { max-width: 220px; }
+input { cursor: text; width: 100%; }
+
+.pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill-idle { background: #2a2420; color: var(--muted); }
+.pill-searching { background: #3a2f17; color: var(--warn); }
+.pill-locked { background: #1f3322; color: var(--ok); }
+.pill-error { background: #3b1f1c; color: var(--bad); }
+
+.meter { width: 60px; height: 6px; background: #2a2420; border-radius: 3px; overflow: hidden; }
+#level { height: 100%; width: 0; background: var(--ok); transition: width .1s linear; }
+
+main { display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
+.stage { padding: 24px 28px; overflow: auto; min-height: 0; }
+.side { border-left: 1px solid var(--line); padding: 16px; overflow: auto; background: var(--panel); }
+.side section + section { margin-top: 20px; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+
+.now { padding: 28px 24px; border: 1px solid var(--line); border-radius: 10px; background: #1a1714; min-height: 150px; }
+.now.empty .tuk { color: var(--muted); }
+.tuk { font-family: var(--gurmukhi); font-size: 40px; line-height: 1.5; font-weight: 600; }
+.meta { color: var(--muted); margin-top: 8px; }
+.v-major { color: var(--accent); }
+.v-minor { color: #d8c3a5; }
+
+.lines { list-style: none; margin: 20px 0 0; padding: 0; }
+.lines li {
+  font-family: var(--gurmukhi); font-size: 20px; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+  border-left: 3px solid transparent;
+}
+.lines li:hover { background: #221d19; }
+.lines li.current { background: #2a2219; border-left-color: var(--accent); }
+.lines li.header { color: var(--muted); font-size: 15px; cursor: default; }
+.lines li.rahao::after { content: 'rahao'; font: 11px system-ui; color: var(--muted); margin-left: 10px; }
+
+.candidates { list-style: none; margin: 0; padding: 0; }
+.candidates li { padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 6px; }
+.candidates .text { font-family: var(--gurmukhi); font-size: 16px; }
+.candidates .row { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.candidates button { padding: 2px 10px; font-size: 12px; }
+.muted { color: var(--muted); }
+
+.stats { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0 0 8px; font-size: 12px; }
+.stats dt { color: var(--muted); }
+.stats dd { margin: 0; font-variant-numeric: tabular-nums; }
+.asr { font-family: var(--gurmukhi); color: var(--muted); font-size: 14px; }
+details summary { color: var(--muted); font-size: 12px; cursor: pointer; }
+
+.error { background: #3b1f1c; color: #f3c7c1; padding: 8px 16px; white-space: pre-wrap; font-size: 12px; }

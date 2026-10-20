@@ -1,0 +1,29 @@
+{
+  "name": "gurbani-live",
+  "version": "0.1.0",
+  "description": "Offline live Gurbani shabad detection and line following (Phase 1)",
+  "private": true,
+  "license": "MIT",
+  "main": "dist/main/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && node scripts/copy-static.mjs",
+    "fetch-assets": "node scripts/fetch-assets.mjs",
+    "build-corpus": "node dist/cli/build-corpus.js",
+    "start": "npm run build && electron .",
+    "run-file": "node dist/cli/run-file.js",
+    "bench": "node dist/cli/bench.js",
+    "score": "node dist/cli/score.js",
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "calibrate": "node dist/cli/calibrate.js"
+  },
+  "dependencies": {
+    "@fontsource/noto-sans-gurmukhi": "^5.3.0",
+    "onnxruntime-node": "1.23.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "44.9.1",
+    "typescript": "^5.9.0"
+  }
+}
