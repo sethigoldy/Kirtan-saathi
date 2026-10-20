@@ -10,7 +10,15 @@ Offline desktop app (Electron, Windows + macOS) that listens to a microphone, wo
 
 Everything runs on the CPU with no network access at runtime. Only canonical Gurbani text is ever displayed; the recognizer's own transcript is used for matching only.
 
-Status: Phase 2 (engine, kirtan + paath + bani modes, operator window, benchmarks, CI). The projector and livestream overlay are Phase 3.
+Status: Phase 3. The engine handles kirtan, paath and bani modes. Outputs are a projector window, an OBS livestream overlay and a phone follow page. Optional Hindi script and Punjabi meanings can be shown under the tuk. Installers are built and tested in CI.
+
+## Download
+
+Get the installer for your computer from the [Releases page](https://github.com/sethigoldy/Kirtan-saathi/releases). The release notes walk through installing step by step, no command line needed:
+
+- **Windows:** setup wizard, `.exe`.
+- **macOS:** `.dmg`, one for Apple Silicon and one for Intel.
+- **Linux:** `.deb`.
 
 ## Results
 
@@ -87,6 +95,8 @@ npm run run-file -- path/to/nitnem.mp3 --mode bani:JAPJ
 
 ## Using the app
 
+### Recognition
+
 - **Mode.** Pick Kirtan, Paath, or a bani from the mode menu. Changing mode clears the lock.
 - **Input.** Choose an input and press **Start listening**. Prefer a line feed from the gurdwara mixer over a laptop mic.
 - **Testing.** **Test with a file** plays a recording through the speakers while the engine follows it.
@@ -94,6 +104,39 @@ npm run run-file -- path/to/nitnem.mp3 --mode bani:JAPJ
 - **Clicking a line** moves the display there; following continues from that line.
 - **Next line.** In paath and bani modes the next line is previewed under the current one.
 - **Find a shabad** searches typed Gurmukhi text.
+
+### Outputs
+
+All outputs render the same display state, so they always show the same line. A local server serves them on `http://127.0.0.1:7531` (the next free port if 7531 is taken).
+
+| Output | How | Notes |
+|---|---|---|
+| **Projector** | **Projector → Show** | Fullscreen on the chosen screen. The app remembers the screen. If that screen is unplugged, the projector closes rather than covering the operator's screen, and it reopens when the screen returns. The display is kept awake. **Esc** closes it. |
+| **OBS overlay** | Browser source, `/overlay`, 1920 × 1080 | Transparent lower third. Query options: `size`, `position=top\|center\|bottom`, `box=0`, `next=0\|1`, `source=0\|1`, `color=ffffff`, `hindi=off\|below\|only`, `meaning=off\|pa\|hi\|both` |
+| **Phones** | Tick *Let phones on this Wi-Fi follow along* | `/follow` shows the whole shabad with the live line highlighted. Readers set text size, script and meaning on their own phone. |
+
+The operator window shows a live preview of the projector. Controls:
+
+- **◀ / ▶** or the arrow keys move the line.
+- **Blank** or **B** blanks every output.
+
+Presentation settings live under *Projector*:
+
+- **Text size.**
+- **Theme:** *Light with Khanda* (default), Dark, Blue and saffron, or Light.
+- **Vishraam colours** and **larivaar.**
+- **Next line** and **source line.**
+- **Hindi (Devanagari):** off, under the Gurmukhi, or instead of it.
+- **Meaning (arth):** Punjabi, Hindi script, or both, shown smaller under the tuk.
+
+Notes on the text shown:
+
+- **No author name.** The source line shows the scripture, raag and page only.
+- **Hindi script.** The tuk is transliterated in code using Hindi gutka conventions (addak doubles the consonant; tippi and bindi become anusvara).
+- **Meanings.** Punjabi arth comes from the Shabad OS Database: Prof. Sahib Singh for Sri Guru Granth Sahib, Dr. Ratan Singh Jaggi for Dasam Granth, Bhai Vir Singh for Vaaran, and others. It covers 99% of lines, and the source is credited on screen.
+- **"Hindi" meaning.** This is the Punjabi arth written in Devanagari, not a Hindi translation. See *Known limitations*.
+
+Settings persist in the app's user-data folder (`settings.json`).
 
 ## How it works
 
@@ -149,6 +192,24 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 |---|---|---|
 | `.github/workflows/ci.yml` | every push and pull request | Build and unit tests, plus a native ONNX Runtime model smoke test on Ubuntu, Windows and macOS |
 | `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
+| `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
+
+### Releasing a version
+
+1. Set `"version"` in `package.json`, for example `0.3.0`, and merge to `main`.
+2. Tag the release: `git tag v0.3.0 && git push origin v0.3.0`.
+3. The *Installers* workflow publishes the release once all four installers pass their install test.
+
+To get a test build without tagging, use *Actions → Installers → Run workflow*. Tick *prerelease* to publish it as a pre-release.
+
+**Signing.** Without certificates the installers are unsigned. Windows then shows *Run anyway* and macOS shows *Open Anyway* the first time; the release notes walk users through both. To remove those prompts, add these repository secrets; the workflow uses them automatically:
+
+| Platform | Secrets |
+|---|---|
+| macOS (Apple Developer ID + notarization) | `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` |
+| Windows (code-signing certificate) | `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD` |
+
+Build installers locally with `npm run dist`. Output goes to `release/`.
 
 Benchmark outputs:
 
@@ -172,9 +233,11 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | `src/engine/engine.ts` | Modes and the search / lock / follow / switch / unlock state machine |
 | `src/engine/pacer.ts` | Real-time pacing tiers |
 | `src/engine/asr.ts` | ONNX Runtime inference and greedy CTC decoding |
-| `src/main/` | Electron main, preload, engine utility process, message protocol |
+| `src/main/` | Electron main, preload, engine utility process, message protocol, display state, presentation server, projector window, settings, meanings |
+| `src/present/`, `static/present/` | Projector / overlay / phone page, Gurmukhi formatting and Devanagari transliteration |
 | `src/renderer/`, `static/` | Operator window, audio capture worklet, styles |
-| `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `score` |
+| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon, macOS entitlements |
+| `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score` |
 | `src/test/` | Unit tests (`npm test`) |
 | `scripts/` | Asset and evaluation-data fetchers |
 | `ci/` | Benchmark thresholds and baseline |
@@ -187,18 +250,22 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | Gurbani text: Shabad OS Database 5.0.0-next.0 | Public domain (per Shabad OS); code MIT | Text is displayed verbatim. Shabad OS forbids derogatory alteration. Version 4.8.7 is **not** used, because its package is CC BY-SA 4.0 / GPL-3.0. |
 | Acoustic model: `karansea/indicconformer-stt-pa-ctc-shabad-preview` | MIT | Fine-tune of AI4Bharat IndicConformer (MIT). Training-data provenance is not documented. |
 | ONNX Runtime | MIT | |
-| Noto Sans Gurmukhi | SIL OFL 1.1 | Bundled for offline rendering |
+| Punjabi arth (meanings), via the Shabad OS Database | Copyright of the respective authors and publishers, as distributed by Shabad OS | Quoted unaltered, with the source credited on screen. Citations are in `THIRD_PARTY_NOTICES.md`. |
+| Noto Sans Gurmukhi, Noto Sans Devanagari | SIL OFL 1.1 | Bundled for offline rendering |
+| Khanda icon (`mdi-khanda`, Material Design Icons) | Apache 2.0 | Watermark in the *Light with Khanda* theme |
 | Benchmark scorer port (`src/cli/score.ts`) | MIT | From Karanbir Singh's benchmark |
 | Evaluation data (downloaded, not bundled) | Benchmark annotations CC BY 4.0; sehaj-paath dataset CC BY 4.0 | "Live Captioning for Gurbani Kirtan benchmark v1"; surindersinghssj/gurbani-sehajpath |
 
 No code was copied from SikhiToTheMax (OSL-3.0) or kirtan-captioning (CC BY-NC-SA). BaniDB data is not used.
 
+The model download is pinned to a Hugging Face revision and checked against a SHA-256, so every installer ships the benchmarked model.
+
 ## Known limitations
 
 - **No katha mode yet.** Katha speech may briefly lock onto a shabad.
 - **Gurmukhi-only text search.** The operator search takes Gurmukhi text; first-letter search is not implemented.
-- **No projector or overlay yet.** There is no second-display projector window or OBS overlay; those are Phase 3.
-- **No signed installers.** Run from source with `npm start`.
+- **No Hindi translation yet.** The *Hindi* meaning shows the Punjabi arth in Devanagari. Real Hindi translations exist in BaniDB, but BaniDB's data is not openly licensed. Bundling it needs permission from the Khalis Foundation; the display already supports it (`DisplayLine.hi`).
+- **Unsigned installers.** Users confirm once (*Run anyway* / *Open Anyway*) until signing secrets are added.
 - **Limited evaluation coverage.** Dasam Granth, Vaaran and Bhai Nand Lal are searchable but have no evaluation audio. The kirtan set is small.
-- **Intel Mac not tested in CI.** It is supported through the ONNX Runtime 1.23.2 pin.
+- **Intel Mac.** CI tests it on `macos-15-intel`. GitHub plans to retire Intel macOS runners in fall 2027.
 - **Deferred: constrained decoding after lock.** At most 2.7% of kirtan frames could benefit. Rescoring identification candidates against the model's raw probabilities is the more promising next step.
