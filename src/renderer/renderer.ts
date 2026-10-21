@@ -190,7 +190,7 @@ function onEngine(msg: FromEngine): void {
         o.textContent = `${b.nameEn} (${b.name})`;
         sel.append(o);
       }
-      const japji = msg.banis.find((b) => /japji/i.test(b.nameEn));
+      const japji = msg.banis.find((b) => /jap\s*ji/i.test(b.nameEn));
       if (japji) sel.value = japji.id;
       renderStats(null, msg);
       break;

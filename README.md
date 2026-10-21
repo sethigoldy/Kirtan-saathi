@@ -231,13 +231,29 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 
 **Decode cache.** Decoded windows are cached in `.cache/asr/` (keyed by audio position and length). After the first run, matcher and tracker changes re-run from cache in minutes; `--cache-only` and `node dist/cli/sweep.js '<json option sets>'` tune parameters in seconds.
 
+### App tests (end-to-end)
+
+`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, recordings, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
+
+```bash
+npm run e2e                                              # this checkout
+```
+
+In PowerShell, against an installed or packaged app:
+
+```powershell
+$env:KIRTAN_APP = "<folder>\Kirtan Saathi.exe"; npm run e2e
+```
+
+Each run uses a temporary settings folder. Screenshots of failed checks and the app's log go to `e2e-results/` (`E2E_OUT`). Checks marked *todo* describe known bugs: they run and report, but do not fail the run.
+
 ### GitHub Actions
 
 | Workflow | When | What |
 |---|---|---|
-| `.github/workflows/ci.yml` | every push and pull request | Build and unit tests, plus a native ONNX Runtime model smoke test on Ubuntu, Windows and macOS |
+| `.github/workflows/ci.yml` | every push and pull request | Build and unit tests, plus a native ONNX Runtime model smoke test on Ubuntu, Windows and macOS. The end-to-end tests on the packaged Windows app |
 | `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
-| `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
+| `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. The installed Windows app also runs the end-to-end tests. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
 
 ### Darbar Sahib recordings (private)
 
@@ -289,6 +305,7 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon, macOS entitlements |
 | `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score`, `caption-label`, `caption-pack`, `caption-eval`, `darbar-batch` |
 | `src/test/` | Unit tests (`npm test`) |
+| `src/e2e/` | End-to-end tests of the running app (`npm run e2e`) |
 | `scripts/` | Asset and evaluation-data fetchers |
 | `ci/` | Benchmark thresholds and baseline |
 

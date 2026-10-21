@@ -22,7 +22,8 @@
     "soak": "node dist/cli/soak.js",
     "dist": "npm run build && electron-builder --publish never",
     "icon": "python3 scripts/make-icon.py",
-    "darbar-batch": "node dist/cli/darbar-batch.js"
+    "darbar-batch": "node dist/cli/darbar-batch.js",
+    "e2e": "npm run build && node --test --test-concurrency=1 --test-reporter=spec \"dist/e2e/*.e2e.js\""
   },
   "dependencies": {
     "onnxruntime-node": "1.23.2"
@@ -34,6 +35,7 @@
     "@types/node": "^22.0.0",
     "electron": "44.9.1",
     "electron-builder": "26.15.3",
+    "playwright-core": "1.63.0",
     "typescript": "^5.9.0"
   },
   "author": {
