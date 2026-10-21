@@ -29,9 +29,12 @@ export interface TrackerOptions {
    * a little, and relative scores alone would move the display at random.
    */
   minEmission: number;
-  /** Posterior needed to show a line from a blank display. */
+  /**
+   * Posterior needed to show a line from a blank display. Below 60% the
+   * display never changes: the line already shown stays.
+   */
   showPosterior: number;
-  /** Posterior and margin needed to switch lines, held for `switchHops`. */
+  /** Posterior (at least 60%) and margin needed to switch lines, held for `switchHops`. */
   switchPosterior: number;
   switchMargin: number;
   switchHops: number;
@@ -48,8 +51,8 @@ export const DEFAULT_TRACKER_OPTIONS: TrackerOptions = {
   beta: 12,
   minQuerySelf: 3,
   minEmission: 0.6,
-  showPosterior: 0.5,
-  switchPosterior: 0.55,
+  showPosterior: 0.6,
+  switchPosterior: 0.6,
   switchMargin: 0.25,
   switchHops: 2,
   instantPosterior: 0.85,

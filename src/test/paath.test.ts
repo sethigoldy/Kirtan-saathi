@@ -56,6 +56,36 @@ test('pauses hold, going back needs repeated evidence, unrelated audio loses the
   assert.equal(lost, true);
 });
 
+test('follower moves the displayed line only at 60% or more', () => {
+  const start = findLine('ਸੋਚੈ ਸੋਚਿ ਨ ਹੋਵਈ ਜੇ ਸੋਚੀ ਲਖ ਵਾਰ ॥');
+  const stream = sourceStream(corpus, start);
+  const f = new PaathFollower(corpus, retriever, stream, start - stream.lines[0]);
+  let shown = f.line, changes = 0, unsure = 0, s = 7;
+  const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  for (let k = 1; k <= 40; k++) {
+    // Each window: end of one line and start of the next, with recognizer errors.
+    const prev = corpus.key[start + k - 1];
+    const cur = corpus.key[start + k];
+    for (const rate of [0.5, 0.3, 0.1]) {
+      let key = '';
+      for (const ch of prev.slice(-12) + cur.slice(0, Math.max(6, Math.floor(cur.length / 2)))) {
+        const r = rnd();
+        if (r >= rate) key += ch;
+        else if (r < rate / 2) key += 'shkgcjtdqxnpbmyrlv'[Math.floor(rnd() * 18)];
+      }
+      const upd = f.update(key);
+      if (upd.score > 0 && upd.score < 0.6) unsure++;
+      if (upd.line !== shown) {
+        changes++;
+        assert.ok(upd.score >= 0.6, `line ${k}: moved at ${(upd.score * 100).toFixed(0)}%`);
+        shown = upd.line;
+      }
+    }
+  }
+  assert.ok(changes >= 30, `followed ${changes} of 40 lines`);
+  assert.ok(unsure > 0, 'some windows were unsure');
+});
+
 test('locate finds a position inside a bani', () => {
   const japji = baniStream(corpus, 'JAPJ');
   assert.ok(japji.lines.length > 300);
