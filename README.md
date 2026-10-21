@@ -151,6 +151,16 @@ npm run run-file -- path/to/nitnem.mp3 --mode bani:JAPJ
 - **Next line.** In paath and bani modes the next line is previewed under the current one.
 - **Find a shabad** (the *Find* tab) searches typed Gurmukhi text.
 
+### Punjabi app
+
+*App → Language → ਪੰਜਾਬੀ* puts the whole app in Punjabi:
+
+- The operator window: buttons, tabs, status, tooltips, messages, and the shabad heading (*ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਰਾਗੁ ਸੋਰਠਿ, ਅੰਗ ੬੨੮*).
+- Every screen's source line and credits, in Gurmukhi with Gurmukhi digits: *ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ · ਰਾਗੁ ਸੋਰਠਿ · ਅੰਗ ੬੨੮ · ਅਰਥ: ਪ੍ਰੋ. ਸਾਹਿਬ ਸਿੰਘ*.
+- The phone page's title and messages.
+
+Gurbani and the meanings are unchanged. Translations are in `src/present/ui-words.ts`. A unit test fails when a word in the operator window has no Punjabi.
+
 ### Updates
 
 When the computer is online, Kirtan Saathi checks GitHub for a new release shortly after it starts and every 6 hours. A notice at the bottom of the window shows the new version and what changed (from `CHANGELOG.md`).
@@ -247,7 +257,7 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 
 ### App tests (end-to-end)
 
-`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, recordings, update notices and self-update downloads, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
+`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, the Punjabi app, recordings, update notices and self-update downloads, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
 
 ```bash
 npm run e2e                                              # this checkout

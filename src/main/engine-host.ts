@@ -48,6 +48,7 @@ function shabadPayload(index: number): UiShabad {
     index,
     id: s.id,
     source: c.sources[s.source]?.nameEn ?? '',
+    sourcePa: c.sources[s.source]?.name ?? '',
     section: s.section,
     author: s.author,
     page: s.page,
@@ -72,6 +73,7 @@ function reportDisplay(): void {
   const report: DisplayReport = {
     mode,
     stream: d.stream,
+    streamPa: d.stream === null ? null : (c.banis.find((b) => b.nameEn === d.stream) ?? c.sources.find((s) => s.nameEn === d.stream))?.name ?? d.stream,
     shabad: d.shabad === null ? null : cachedShabad(d.shabad),
     line: d.line,
     next: d.next === null ? null : { line: d.next, text: c.text[d.next], role: c.role[d.next] },
@@ -96,6 +98,7 @@ function candidate(shabad: number, line: number, score: number, evidence: number
     line,
     text: c.plain[line],
     source: c.sources[c.shabads[shabad].source]?.nameEn ?? '',
+    sourcePa: c.sources[c.shabads[shabad].source]?.name ?? '',
     page: c.page[line],
     score,
     evidence,

@@ -16,22 +16,22 @@
         <rect x="28" y="22" width="17" height="4" rx="2" />
         <rect x="28" y="29" width="11" height="4" rx="2" class="dim" />
       </svg>
-      <span>Kirtan Saathi</span>
+      <span data-i18n="Kirtan Saathi">Kirtan Saathi</span>
     </div>
 
-    <div class="modes" role="radiogroup" aria-label="What is being recited">
-      <button type="button" role="radio" data-mode="kirtan" aria-checked="true"><span lang="pa">ਕੀਰਤਨ</span> Kirtan</button>
-      <button type="button" role="radio" data-mode="paath" aria-checked="false"><span lang="pa">ਪਾਠ</span> Paath</button>
-      <button type="button" role="radio" data-mode="bani" aria-checked="false"><span lang="pa">ਬਾਣੀ</span> Bani</button>
-      <select id="bani" title="Which bani" hidden></select>
+    <div class="modes" role="radiogroup" aria-label="What is being recited" data-i18n-aria-label="What is being recited">
+      <button type="button" role="radio" data-mode="kirtan" aria-checked="true"><span lang="pa">ਕੀਰਤਨ</span><span class="en-only"> Kirtan</span></button>
+      <button type="button" role="radio" data-mode="paath" aria-checked="false"><span lang="pa">ਪਾਠ</span><span class="en-only"> Paath</span></button>
+      <button type="button" role="radio" data-mode="bani" aria-checked="false"><span lang="pa">ਬਾਣੀ</span><span class="en-only"> Bani</span></button>
+      <select id="bani" title="Which bani" data-i18n-title="Which bani" hidden></select>
     </div>
 
     <div class="listen">
-      <label class="input-pick" title="Microphone or mixer input">
+      <label class="input-pick" title="Microphone or mixer input" data-i18n-title="Microphone or mixer input">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3" /></svg>
-        <select id="device" aria-label="Input"></select>
+        <select id="device" aria-label="Input" data-i18n-aria-label="Input"></select>
       </label>
-      <div class="meter" title="Input level" aria-hidden="true"><div id="level"></div></div>
+      <div class="meter" title="Input level" data-i18n-title="Input level" aria-hidden="true"><div id="level"></div></div>
       <button id="mic" class="primary" disabled>Start listening</button>
     </div>
   </header>
@@ -45,140 +45,147 @@
         </div>
         <div id="now-meta" class="now-meta"></div>
         <div class="status-actions">
-          <label class="ghost" title="Play a recording and follow it">
-            Play a recording<input id="file" type="file" accept="audio/*,video/webm" hidden />
+          <label class="ghost" title="Play a recording and follow it" data-i18n-title="Play a recording and follow it">
+            <span data-i18n="Play a recording">Play a recording</span><input id="file" type="file" accept="audio/*,video/webm" hidden />
           </label>
-          <button id="reset" class="ghost" title="Forget the current shabad and look again">Search again</button>
+          <button id="reset" class="ghost" title="Forget the current shabad and look again" data-i18n-title="Forget the current shabad and look again" data-i18n="Search again">Search again</button>
         </div>
       </div>
 
       <div class="screen">
         <figure class="preview">
           <div class="preview-wrap">
-            <iframe id="preview" tabindex="-1" title="What the sangat sees"></iframe>
-            <div id="blank-badge" class="blanked" hidden>Screen is blank</div>
+            <iframe id="preview" tabindex="-1" title="What the sangat sees" data-i18n-title="What the sangat sees"></iframe>
+            <div id="blank-badge" class="blanked" data-i18n="Screen is blank" hidden>Screen is blank</div>
           </div>
-          <figcaption>On screen now</figcaption>
+          <figcaption data-i18n="On screen now">On screen now</figcaption>
         </figure>
         <div class="steer">
-          <button id="prev" title="Previous line (Left arrow)"><kbd>←</kbd> Previous</button>
-          <button id="blank" title="Blank every screen (B)"><kbd>B</kbd> Blank</button>
-          <button id="next" title="Next line (Right arrow)">Next <kbd>→</kbd></button>
+          <button id="prev" title="Previous line (Left arrow)" data-i18n-title="Previous line (Left arrow)"><kbd>←</kbd> <span data-i18n="Previous">Previous</span></button>
+          <button id="blank" title="Blank every screen (B)" data-i18n-title="Blank every screen (B)"><kbd>B</kbd> <span id="blank-label">Blank</span></button>
+          <button id="next" title="Next line (Right arrow)" data-i18n-title="Next line (Right arrow)"><span data-i18n="Next">Next</span> <kbd>→</kbd></button>
         </div>
       </div>
 
       <ol id="guide" class="guide">
-        <li><strong>Choose what is being recited</strong> at the top: kirtan, paath, or a bani.</li>
-        <li><strong>Choose the input</strong>: the microphone, or the line from the gurdwara mixer (clearer).</li>
-        <li><strong>Press Start listening.</strong> The shabad appears here within a few seconds and follows along. Click any line to show it yourself.</li>
+        <li data-i18n-html="guide1"><strong>Choose what is being recited</strong> at the top: kirtan, paath, or a bani.</li>
+        <li data-i18n-html="guide2"><strong>Choose the input</strong>: the microphone, or the line from the gurdwara mixer (clearer).</li>
+        <li data-i18n-html="guide3"><strong>Press Start listening.</strong> The shabad appears here within a few seconds and follows along. Click any line to show it yourself.</li>
       </ol>
       <ol id="lines" class="lines" lang="pa"></ol>
     </section>
 
     <aside class="side">
       <div class="tabs" role="tablist">
-        <button role="tab" aria-selected="true" data-tab="screen">Screen</button>
-        <button role="tab" aria-selected="false" data-tab="share">Share</button>
-        <button role="tab" aria-selected="false" data-tab="find">Find</button>
-        <button role="tab" aria-selected="false" data-tab="app">App</button>
+        <button role="tab" aria-selected="true" data-tab="screen" data-i18n="Screen">Screen</button>
+        <button role="tab" aria-selected="false" data-tab="share" data-i18n="Share">Share</button>
+        <button role="tab" aria-selected="false" data-tab="find" data-i18n="Find">Find</button>
+        <button role="tab" aria-selected="false" data-tab="app" data-i18n="App">App</button>
       </div>
 
       <div class="panel" data-panel="screen">
         <section class="group">
-          <h2>Projector</h2>
+          <h2 data-i18n="Projector">Projector</h2>
           <div class="field-row">
-            <select id="proj-display" title="Screen for the sangat"></select>
+            <select id="proj-display" title="Screen for the sangat" data-i18n-title="Screen for the sangat"></select>
             <button id="proj-toggle" class="primary">Show</button>
           </div>
           <p id="proj-status" class="hint"></p>
         </section>
 
         <section class="group">
-          <h2>Look</h2>
+          <h2 data-i18n="Look">Look</h2>
           <div class="size-row">
             <span class="a-small" aria-hidden="true">ਅ</span>
-            <input id="font-scale" type="range" min="0.5" max="2.5" step="0.05" aria-label="Text size" />
+            <input id="font-scale" type="range" min="0.5" max="2.5" step="0.05" aria-label="Text size" data-i18n-aria-label="Text size" />
             <span class="a-large" aria-hidden="true">ਅ</span>
           </div>
-          <div class="swatches" role="radiogroup" aria-label="Colours">
-            <label class="swatch sw-khanda"><input type="radio" name="theme" value="khanda" /><span class="chip"></span>Khanda</label>
-            <label class="swatch sw-dark"><input type="radio" name="theme" value="dark" /><span class="chip"></span>Dark</label>
-            <label class="swatch sw-saffron"><input type="radio" name="theme" value="saffron" /><span class="chip"></span>Blue</label>
-            <label class="swatch sw-light"><input type="radio" name="theme" value="light" /><span class="chip"></span>Light</label>
+          <div class="swatches" role="radiogroup" aria-label="Colours" data-i18n-aria-label="Colours">
+            <label class="swatch sw-khanda"><input type="radio" name="theme" value="khanda" /><span class="chip"></span><span data-i18n="Khanda">Khanda</span></label>
+            <label class="swatch sw-dark"><input type="radio" name="theme" value="dark" /><span class="chip"></span><span data-i18n="Dark">Dark</span></label>
+            <label class="swatch sw-saffron"><input type="radio" name="theme" value="saffron" /><span class="chip"></span><span data-i18n="Blue">Blue</span></label>
+            <label class="swatch sw-light"><input type="radio" name="theme" value="light" /><span class="chip"></span><span data-i18n="Light">Light</span></label>
           </div>
         </section>
 
         <section class="group">
-          <h2>Hindi script</h2>
-          <div class="seg" role="radiogroup" aria-label="Hindi script">
-            <label><input type="radio" name="hindi" value="off" /><span>Off</span></label>
-            <label><input type="radio" name="hindi" value="below" /><span>Under the tuk</span></label>
-            <label><input type="radio" name="hindi" value="only" /><span>Hindi only</span></label>
+          <h2 data-i18n="Hindi script">Hindi script</h2>
+          <div class="seg" role="radiogroup" aria-label="Hindi script" data-i18n-aria-label="Hindi script">
+            <label><input type="radio" name="hindi" value="off" /><span data-i18n="Off">Off</span></label>
+            <label><input type="radio" name="hindi" value="below" /><span data-i18n="Under the tuk">Under the tuk</span></label>
+            <label><input type="radio" name="hindi" value="only" /><span data-i18n="Hindi only">Hindi only</span></label>
           </div>
         </section>
 
         <section class="group">
-          <h2>Meaning <span lang="pa">ਅਰਥ</span></h2>
-          <div class="seg" role="group" aria-label="Meaning">
+          <h2><span class="en-only">Meaning </span><span lang="pa">ਅਰਥ</span></h2>
+          <div class="seg" role="group" aria-label="Meaning" data-i18n-aria-label="Meaning">
             <label><input type="checkbox" name="meaning" value="pa" /><span lang="pa">ਪੰਜਾਬੀ</span></label>
             <label><input type="checkbox" name="meaning" value="hi" /><span lang="hi">हिंदी</span></label>
-            <label><input type="checkbox" name="meaning" value="en" /><span>English</span></label>
+            <label><input type="checkbox" name="meaning" value="en" /><span data-i18n="English">English</span></label>
           </div>
-          <p class="hint">Choose any of them, or none. Hindi shows the Punjabi arth in Hindi script.</p>
+          <p class="hint" data-i18n="Choose any of them, or none. Hindi shows the Punjabi arth in Hindi script.">Choose any of them, or none. Hindi shows the Punjabi arth in Hindi script.</p>
         </section>
 
         <section class="group switches">
-          <label class="switch"><input type="checkbox" id="opt-vishraam" /><span class="track"></span>Vishraam colours</label>
-          <label class="switch"><input type="checkbox" id="opt-larivaar" /><span class="track"></span>Larivaar (joined words)</label>
-          <label class="switch"><input type="checkbox" id="opt-next" /><span class="track"></span>Next line in paath and banis</label>
-          <label class="switch"><input type="checkbox" id="opt-source" /><span class="track"></span>Source and ang</label>
-          <label class="switch"><input type="checkbox" id="opt-waheguru" /><span class="track"></span><span><span lang="pa">ਵਾਹਿਗੁਰੂ</span> while searching</span></label>
+          <label class="switch"><input type="checkbox" id="opt-vishraam" /><span class="track"></span><span data-i18n="Vishraam colours">Vishraam colours</span></label>
+          <label class="switch"><input type="checkbox" id="opt-larivaar" /><span class="track"></span><span data-i18n="Larivaar (joined words)">Larivaar (joined words)</span></label>
+          <label class="switch"><input type="checkbox" id="opt-next" /><span class="track"></span><span data-i18n="Next line in paath and banis">Next line in paath and banis</span></label>
+          <label class="switch"><input type="checkbox" id="opt-source" /><span class="track"></span><span data-i18n="Source and ang">Source and ang</span></label>
+          <label class="switch"><input type="checkbox" id="opt-waheguru" /><span class="track"></span><span data-i18n-html="waheguru"><span lang="pa">ਵਾਹਿਗੁਰੂ</span> while searching</span></label>
         </section>
       </div>
 
       <div class="panel" data-panel="share" hidden>
         <section class="group">
-          <h2>Livestream</h2>
-          <p class="hint">In OBS, add a <em>Browser</em> source with this address, size 1920 × 1080. The background stays transparent.</p>
-          <div class="url-row"><code id="url-overlay"></code><button data-copy="url-overlay">Copy</button></div>
+          <h2 data-i18n="Livestream">Livestream</h2>
+          <p class="hint" data-i18n-html="livestream">In OBS, add a <em>Browser</em> source with this address, size 1920 × 1080. The background stays transparent.</p>
+          <div class="url-row"><code id="url-overlay"></code><button data-copy="url-overlay" data-i18n="Copy">Copy</button></div>
         </section>
         <section class="group">
-          <h2>Phones and tablets</h2>
-          <label class="switch"><input type="checkbox" id="opt-lan" /><span class="track"></span>Let phones on this Wi-Fi follow along</label>
+          <h2 data-i18n="Phones and tablets">Phones and tablets</h2>
+          <label class="switch"><input type="checkbox" id="opt-lan" /><span class="track"></span><span data-i18n="Let phones on this Wi-Fi follow along">Let phones on this Wi-Fi follow along</span></label>
           <div id="lan-urls" class="lan"></div>
         </section>
       </div>
 
       <div class="panel" data-panel="find" hidden>
         <section class="group">
-          <h2>Find a shabad</h2>
-          <form id="search-form"><input id="search" placeholder="Type Gurmukhi, e.g. ਪੋਥੀ ਪਰਮੇਸਰ" autocomplete="off" lang="pa" /></form>
+          <h2 data-i18n="Find a shabad">Find a shabad</h2>
+          <form id="search-form"><input id="search" placeholder="Type Gurmukhi, e.g. ਪੋਥੀ ਪਰਮੇਸਰ" data-i18n-placeholder="Type Gurmukhi, e.g. ਪੋਥੀ ਪਰਮੇਸਰ" autocomplete="off" lang="pa" /></form>
           <ol id="results" class="candidates"></ol>
         </section>
         <section class="group">
-          <h2>Other possible shabads</h2>
-          <ol id="candidates" class="candidates"><li class="empty">They appear while listening.</li></ol>
+          <h2 data-i18n="Other possible shabads">Other possible shabads</h2>
+          <ol id="candidates" class="candidates"><li class="empty" data-i18n="They appear while listening.">They appear while listening.</li></ol>
         </section>
       </div>
 
       <div class="panel" data-panel="app" hidden>
         <section class="group">
-          <h2>Updates</h2>
+          <h2><span class="en-only">Language · </span><span lang="pa">ਭਾਸ਼ਾ</span></h2>
+          <div class="seg" role="radiogroup" aria-label="Language" data-i18n-aria-label="Language">
+            <label><input type="radio" name="language" value="en" /><span>English</span></label>
+            <label><input type="radio" name="language" value="pa" /><span lang="pa">ਪੰਜਾਬੀ</span></label>
+          </div>
+        </section>
+        <section class="group">
+          <h2 data-i18n="Updates">Updates</h2>
           <p id="app-version" class="version"></p>
           <div class="switches">
-            <label class="switch"><input type="checkbox" id="opt-update-check" /><span class="track"></span>Check for updates when online</label>
-            <label class="switch"><input type="checkbox" id="opt-update-auto" /><span class="track"></span>Install updates automatically</label>
+            <label class="switch"><input type="checkbox" id="opt-update-check" /><span class="track"></span><span data-i18n="Check for updates when online">Check for updates when online</span></label>
+            <label class="switch"><input type="checkbox" id="opt-update-auto" /><span class="track"></span><span data-i18n="Install updates automatically">Install updates automatically</span></label>
           </div>
           <p id="update-auto-hint" class="hint">Updates download in the background and install when you close Kirtan Saathi, never during kirtan.</p>
-          <div class="field-row"><button id="update-check">Check now</button></div>
+          <div class="field-row"><button id="update-check" data-i18n="Check now">Check now</button></div>
           <p id="update-state" class="hint" role="status"></p>
         </section>
       </div>
 
       <details class="details">
-        <summary>Technical details</summary>
+        <summary data-i18n="Technical details">Technical details</summary>
         <dl id="stats" class="stats"></dl>
-        <p class="hint">What the recognizer heard (never shown to the sangat):</p>
+        <p class="hint" data-i18n="What the recognizer heard (never shown to the sangat):">What the recognizer heard (never shown to the sangat):</p>
         <p id="asr" class="asr" lang="pa"></p>
       </details>
     </aside>
@@ -191,8 +198,8 @@
     </div>
     <div class="update-actions">
       <button id="update-install" class="primary">Update now</button>
-      <button id="update-download">Download</button>
-      <button id="update-later" class="ghost">Later</button>
+      <button id="update-download" data-i18n="Download">Download</button>
+      <button id="update-later" class="ghost" data-i18n="Later">Later</button>
     </div>
   </section>
   <footer id="error" class="error" role="alert" hidden></footer>

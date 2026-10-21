@@ -29,6 +29,8 @@ export interface PresentationSettings {
   meaning: MeaningLang[];
   /** 'khanda': light background with a Khanda watermark. */
   theme: 'khanda' | 'dark' | 'light' | 'saffron';
+  /** The app's own words (not Gurbani): labels, the source line, credits. */
+  language: 'en' | 'pa';
 }
 
 export const DEFAULT_SETTINGS: PresentationSettings = {
@@ -41,6 +43,7 @@ export const DEFAULT_SETTINGS: PresentationSettings = {
   hindi: 'off',
   meaning: [],
   theme: 'khanda',
+  language: 'en',
 };
 
 export interface DisplayLine {
@@ -59,6 +62,8 @@ export interface DisplayLine {
 export interface DisplayShabad {
   index: number;
   source: string;
+  /** Scripture name in Gurmukhi. */
+  sourcePa?: string;
   section: string;
   author: string;
   page: number;
@@ -88,6 +93,8 @@ export interface DisplayView {
 export interface DisplayReport {
   mode: 'kirtan' | 'paath' | 'bani';
   stream: string | null;
+  /** The stream (bani or scripture) name in Gurmukhi. */
+  streamPa?: string | null;
   shabad: DisplayShabad | null;
   line: number | null;
   next: DisplayLine | null;
