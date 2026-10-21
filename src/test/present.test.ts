@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { DisplayState, type DisplayReport, type DisplayView } from '../main/display-state';
 import { controlAllowed, PresentationServer, type ControlAction } from '../main/server';
 import { parseSettings, SettingsStore } from '../main/settings';
-import { plainText, toDevanagari, tokens } from '../present/format';
+import { parseMeaning, plainText, toDevanagari, tokens } from '../present/format';
 import { Meanings } from '../main/meanings';
 
 const SHABAD = {
@@ -67,7 +67,7 @@ test('display state emits only on real changes and hides next in kirtan', () => 
   assert.equal(s.fontScale, 2.5);
   assert.equal(s.theme, 'khanda', 'invalid theme falls back to the default');
   assert.equal(s.hindi, 'off');
-  assert.equal(s.meaning, 'off');
+  assert.deepEqual(s.meaning, []);
 });
 
 test('Gurmukhi to Devanagari follows Hindi gutka conventions', () => {
@@ -80,21 +80,45 @@ test('Gurmukhi to Devanagari follows Hindi gutka conventions', () => {
   assert.deepEqual(hi.map((t) => [t.text, t.pause]), [['गुरि', null], ['पूरै', 'main'], ['किरपा', null], ['धारी', null], ['॥', null]]);
 });
 
-test('meanings attach to every line only when switched on, with a credit', () => {
+test('meanings attach to every line only when switched on, with a credit per language', () => {
   const pa = Array<string>(200).fill('');
+  const en = Array<string>(200).fill('');
   const src = Array<number>(200).fill(-1);
   pa[101] = 'ਪੂਰੇ ਗੁਰੂ ਨੇ ਮੇਹਰ ਕੀਤੀ';
+  en[101] = 'The Perfect Guru has shown His Mercy.';
   src[101] = 0;
-  const m = Meanings.from({ sources: [{ id: 'PSST', name: 'Prof. Sahib Singh, Sri Guru Granth Darpan' }], pa, paSource: src });
+  const m = Meanings.from({
+    sources: [{ id: 'PSST', name: 'Prof. Sahib Singh, Sri Guru Granth Darpan' }],
+    pa,
+    paSource: src,
+    enSources: [{ id: 'DSSK', name: 'Dr. Sant Singh Khalsa, Siri Guru Granth Sahib' }],
+    en,
+    enSource: src,
+  });
   const d = new DisplayState({}, m);
   d.update(report(101));
-  assert.equal(d.view().current?.pa, undefined, 'off by default');
+  assert.deepEqual(d.view().settings.meaning, [], 'off by default');
   assert.equal(d.view().credit, '');
-  d.updateSettings({ meaning: 'both' });
-  const v = d.view();
+  assert.equal(d.view().current?.en, 'The Perfect Guru has shown His Mercy.', 'lines carry every language, for phones');
+  d.updateSettings({ meaning: ['pa'] });
+  let v = d.view();
   assert.equal(v.current?.pa, 'ਪੂਰੇ ਗੁਰੂ ਨੇ ਮੇਹਰ ਕੀਤੀ');
   assert.equal(v.lines.find((l) => l.line === 101)?.pa, 'ਪੂਰੇ ਗੁਰੂ ਨੇ ਮੇਹਰ ਕੀਤੀ');
   assert.equal(v.credit, 'Arth: Prof. Sahib Singh');
+  d.updateSettings({ meaning: ['pa', 'en'] });
+  v = d.view();
+  assert.equal(v.credit, 'Arth: Prof. Sahib Singh · Translation: Dr. Sant Singh Khalsa');
+  assert.deepEqual(v.credits, { arth: 'Prof. Sahib Singh', translation: 'Dr. Sant Singh Khalsa' });
+  assert.equal(d.updateSettings({ meaning: ['en'] }) && d.view().credit, 'Translation: Dr. Sant Singh Khalsa');
+});
+
+test('meaning settings from older versions and the overlay address', () => {
+  const d = new DisplayState({ meaning: 'both' as never });
+  assert.deepEqual(d.settings.meaning, ['pa', 'hi'], 'old "both" is Punjabi and Hindi');
+  assert.deepEqual(d.updateSettings({ meaning: 'hi' as never }).meaning, ['hi']);
+  assert.deepEqual(d.updateSettings({ meaning: 'off' as never }).meaning, []);
+  assert.deepEqual(d.updateSettings({ meaning: ['en', 'pa', 'xx', 'en'] as never }).meaning, ['pa', 'en'], 'known languages, fixed order');
+  assert.deepEqual(parseMeaning('en,pa'), ['pa', 'en']);
 });
 
 test('control is open on loopback, PIN-gated on the LAN', () => {

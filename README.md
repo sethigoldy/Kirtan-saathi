@@ -12,7 +12,7 @@ Offline desktop app (Electron, Windows + macOS) that listens to a microphone, wo
 
 Everything runs on the CPU with no network access at runtime. Only canonical Gurbani text is ever displayed; the recognizer's own transcript is used for matching only.
 
-Status: Phase 3. The engine handles kirtan, paath and bani modes. Outputs are a projector window, an OBS livestream overlay and a phone follow page. Optional Hindi script and Punjabi meanings can be shown under the tuk. Installers are built and tested in CI.
+Status: Phase 3. The engine handles kirtan, paath and bani modes. Outputs are a projector window, an OBS livestream overlay and a phone follow page. Optional Hindi script and Punjabi, Hindi-script and English meanings can be shown under the tuk. Installers are built and tested in CI.
 
 ## What it looks like
 
@@ -35,7 +35,7 @@ In paath mode the app follows the reading line by line, across shabads, and prev
 The default theme is *Light with Khanda*. Optional extras under the tuk:
 
 - **Hindi script:** the tuk in Devanagari.
-- **Meaning:** Punjabi arth, in Gurmukhi and/or Hindi script.
+- **Meaning:** Punjabi arth (in Gurmukhi and/or Hindi script) and the English translation, in any combination.
 
 The source line shows the scripture, raag, ang and whose arth is shown, but not the author's name. Vishraam points are coloured.
 
@@ -169,7 +169,7 @@ All outputs render the same display state, so they always show the same line. A 
 | Output | How | Notes |
 |---|---|---|
 | **Projector** | **Projector → Show** | Fullscreen on the chosen screen. The app remembers the screen. If that screen is unplugged, the projector closes rather than covering the operator's screen, and it reopens when the screen returns. The display is kept awake. **Esc** closes it. |
-| **OBS overlay** | Browser source, `/overlay`, 1920 × 1080 | Transparent lower third. Query options: `size`, `position=top\|center\|bottom`, `box=0`, `next=0\|1`, `source=0\|1`, `waheguru=0\|1`, `color=ffffff`, `hindi=off\|below\|only`, `meaning=off\|pa\|hi\|both` |
+| **OBS overlay** | Browser source, `/overlay`, 1920 × 1080 | Transparent lower third. Query options: `size`, `position=top\|center\|bottom`, `box=0`, `next=0\|1`, `source=0\|1`, `waheguru=0\|1`, `color=ffffff`, `hindi=off\|below\|only`, `meaning=off` or a list of `pa`, `hi`, `en` (e.g. `meaning=pa,en`) |
 | **Phones** | Tick *Let phones on this Wi-Fi follow along* | `/follow` shows the whole shabad with the live line highlighted. Readers set text size, script and meaning on their own phone. |
 
 The operator window shows a live preview of the projector. Controls:
@@ -185,13 +185,14 @@ Presentation settings live under *Projector*:
 - **Next line** and **source line.**
 - **ਵਾਹਿਗੁਰੂ while searching** (on by default): the projector and overlay show ਵਾਹਿਗੁਰੂ until the first line is found, after **Search again**, and when the mode changes. **Blank** still blanks every output.
 - **Hindi (Devanagari):** off, under the Gurmukhi, or instead of it.
-- **Meaning (arth):** Punjabi, Hindi script, or both, shown smaller under the tuk.
+- **Meaning:** any of Punjabi arth, the arth in Hindi script, and the English translation, shown smaller under the tuk in that order.
 
 Notes on the text shown:
 
 - **No author name.** The source line shows the scripture, raag and page only.
 - **Hindi script.** The tuk is transliterated in code using Hindi gutka conventions (addak doubles the consonant; tippi and bindi become anusvara).
-- **Meanings.** Punjabi arth comes from the Shabad OS Database: Prof. Sahib Singh for Sri Guru Granth Sahib, Dr. Ratan Singh Jaggi for Dasam Granth, Bhai Vir Singh for Vaaran, and others. It covers 99% of lines, and the source is credited on screen.
+- **Meanings.** Punjabi arth comes from the Shabad OS Database: Prof. Sahib Singh for Sri Guru Granth Sahib, Dr. Ratan Singh Jaggi for Dasam Granth, Bhai Vir Singh for Vaaran, and others. It covers 99% of lines.
+- **English.** Also from the Shabad OS Database: Dr. Sant Singh Khalsa for Sri Guru Granth Sahib, Dr. Surinder Singh Kohli for Dasam Granth (about half of its lines), Jodh Singh for Vaaran, and others. Each source is credited on screen, e.g. *Arth: Prof. Sahib Singh · Translation: Dr. Sant Singh Khalsa*.
 - **"Hindi" meaning.** This is the Punjabi arth written in Devanagari, not a Hindi translation. See *Known limitations*.
 
 Settings persist in the app's user-data folder (`settings.json`).
@@ -331,7 +332,7 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | Gurbani text: Shabad OS Database 5.0.0-next.0 | Public domain (per Shabad OS); code MIT | Text is displayed verbatim. Shabad OS forbids derogatory alteration. Version 4.8.7 is **not** used, because its package is CC BY-SA 4.0 / GPL-3.0. |
 | Acoustic model: `karansea/indicconformer-stt-pa-ctc-shabad-preview` | MIT | Fine-tune of AI4Bharat IndicConformer (MIT). Training-data provenance is not documented. |
 | ONNX Runtime | MIT | |
-| Punjabi arth (meanings), via the Shabad OS Database | Copyright of the respective authors and publishers, as distributed by Shabad OS | Quoted unaltered, with the source credited on screen. Citations are in `THIRD_PARTY_NOTICES.md`. |
+| Punjabi arth and English translations (meanings), via the Shabad OS Database | Copyright of the respective authors and publishers, as distributed by Shabad OS | Quoted unaltered, with the source credited on screen. Citations are in `THIRD_PARTY_NOTICES.md`. |
 | Noto Sans Gurmukhi, Noto Sans Devanagari | SIL OFL 1.1 | Bundled for offline rendering |
 | Khanda icon (`mdi-khanda`, Material Design Icons) | Apache 2.0 | Watermark in the *Light with Khanda* theme |
 | Benchmark scorer port (`src/cli/score.ts`) | MIT | From Karanbir Singh's benchmark |

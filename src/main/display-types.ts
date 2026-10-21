@@ -3,6 +3,9 @@
  * presentation page (no Node imports, so both builds can use it).
  */
 
+/** Meanings under the tuk: Punjabi arth, Hindi, English translation. */
+export type MeaningLang = 'pa' | 'hi' | 'en';
+
 export interface PresentationSettings {
   /** Write Gurbani without spaces between words. */
   larivaar: boolean;
@@ -19,10 +22,11 @@ export interface PresentationSettings {
   /** Devanagari (Hindi script) transliteration: under the Gurmukhi, or instead of it. */
   hindi: 'off' | 'below' | 'only';
   /**
-   * Meaning (arth) under the tuk: Punjabi, Hindi, or both. Hindi uses a Hindi
-   * translation when one is bundled, otherwise the Punjabi arth in Hindi script.
+   * Meanings under the tuk, in this order (empty = off): Punjabi arth, Hindi
+   * (a Hindi translation when one is bundled, otherwise the Punjabi arth in
+   * Hindi script), English translation.
    */
-  meaning: 'off' | 'pa' | 'hi' | 'both';
+  meaning: MeaningLang[];
   /** 'khanda': light background with a Khanda watermark. */
   theme: 'khanda' | 'dark' | 'light' | 'saffron';
 }
@@ -35,7 +39,7 @@ export const DEFAULT_SETTINGS: PresentationSettings = {
   waheguru: true,
   fontScale: 1,
   hindi: 'off',
-  meaning: 'off',
+  meaning: [],
   theme: 'khanda',
 };
 
@@ -48,6 +52,8 @@ export interface DisplayLine {
   pa?: string;
   /** Hindi meaning, when a Hindi translation is bundled. */
   hi?: string;
+  /** English translation. */
+  en?: string;
 }
 
 export interface DisplayShabad {
@@ -71,8 +77,10 @@ export interface DisplayView {
   next: DisplayLine | null;
   /** Whole shabad, for the follow page. */
   lines: DisplayLine[];
-  /** Whose arth is shown, e.g. "Arth: Prof. Sahib Singh" ('' when meanings are off). */
+  /** Credit for the meanings shown, e.g. "Arth: Prof. Sahib Singh · Translation: Dr. Sant Singh Khalsa" ('' when off). */
   credit: string;
+  /** Per-language credits, so a phone showing its own choice credits it. */
+  credits: { arth: string; translation: string };
   settings: PresentationSettings;
 }
 
