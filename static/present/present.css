@@ -106,11 +106,10 @@ button { font: inherit; }
 .v-medium { color: var(--v-medium); }
 .v-short { color: var(--v-short); }
 
-/* Gurmukhi line with optional Hindi (Devanagari) transliteration */
-.hi { font-family: var(--devanagari); font-size: 0.62em; color: var(--hindi); margin-top: 0.2em; line-height: 1.4; }
-.hi.solo { font-family: var(--devanagari); font-size: 1em; color: inherit; margin-top: 0; }
-.follow-lines .hi { font-size: 0.72em; font-weight: 400; }
-.follow-lines li.current .hi { font-weight: 600; }
+/* Gurmukhi line with optional Hindi (Devanagari) transliteration, the same size
+   and weight as the Gurmukhi. Only the meaning (arth) below is smaller. */
+.hi { font-family: var(--devanagari); color: var(--hindi); margin-top: 0.2em; line-height: 1.4; }
+.hi.solo { color: inherit; margin-top: 0; }
 
 /* Meaning (arth) under the tuk: smaller, regular weight */
 .arth { font-size: 0.5em; font-weight: 400; color: var(--next); margin-top: 0.45em; line-height: 1.45; }
