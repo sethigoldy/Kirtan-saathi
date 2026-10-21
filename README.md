@@ -323,7 +323,7 @@ For each version:
 2. In Partner Center, start a submission (the first one, or *Update* on the last) and upload the `.appx` under *Packages*. Each submission needs a higher version than the last.
 3. The first submission also needs:
    - **Privacy policy URL:** <https://github.com/sethigoldy/Kirtan-saathi/blob/main/PRIVACY.md>
-   - **Store listing:** a description and screenshots (`docs/screenshots/`).
+   - **Store listing:** the text in `docs/store/listing.md` and the screenshots in `docs/store/` (taken by `src/e2e/screenshots.ts`).
    - **Age rating questionnaire.**
    - **Why the app needs `runFullTrust`:** *Kirtan Saathi is a desktop (Electron) app packaged with MSIX. It runs its speech recognition and its local presentation server as a desktop process.*
 4. Submit for certification. The Store then updates installed copies.
