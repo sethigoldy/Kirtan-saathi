@@ -155,8 +155,8 @@ describe('Kirtan Saathi app', () => {
 
   check('shows a confidence of at most 100% while following', async () => {
     const pct = Number((await text('#status-text')).match(/(\d+)% sure/)?.[1]);
-    assert.ok(pct <= 100, `status shows ${pct}% sure`);
-  }, { todo: 'paath confidence is not a 0–1 probability, so the status can read e.g. "Following (371% sure)"' });
+    assert.ok(pct >= 0 && pct <= 100, `status shows ${pct}% sure`);
+  });
 
   check('switches the input while listening', async () => {
     const options = await page().$$eval('#device option', (o) => o.map((x) => ({ value: (x as HTMLOptionElement).value, label: x.textContent ?? '' })));
