@@ -5,7 +5,28 @@
  *
  * Shabad OS marks pauses after a word: ';' main, ',' medium, '.' short.
  */
+import type { MeaningLang } from '../main/display-types';
+
 export type Pause = 'main' | 'medium' | 'short' | null;
+
+export const MEANING_LANGS: MeaningLang[] = ['pa', 'hi', 'en'];
+
+/**
+ * Meaning setting from current or older values: a list, a comma list
+ * ("pa,en"), "off", or the older single choices "pa", "hi" and "both" (pa + hi).
+ */
+export function parseMeaning(v: unknown): MeaningLang[] {
+  const list = Array.isArray(v) ? v : typeof v === 'string' ? (v === 'both' ? ['pa', 'hi'] : v.split(',')) : [];
+  return MEANING_LANGS.filter((l) => list.includes(l));
+}
+
+/** "Arth: … · Translation: …" for the meanings shown (Hindi shows the Punjabi arth). */
+export function creditText(credits: { arth: string; translation: string }, langs: MeaningLang[]): string {
+  const parts: string[] = [];
+  if ((langs.includes('pa') || langs.includes('hi')) && credits.arth) parts.push(`Arth: ${credits.arth}`);
+  if (langs.includes('en') && credits.translation) parts.push(`Translation: ${credits.translation}`);
+  return parts.join(' · ');
+}
 
 export interface Token {
   text: string;

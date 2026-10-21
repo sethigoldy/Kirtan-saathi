@@ -4,7 +4,7 @@
  * Gurbani for the line the engine reports. Raw ASR text is debug-only.
  */
 import type { FromEngine, ToEngine, UiCandidate, UiEvent, UiShabad } from '../main/protocol';
-import type { DisplayView, PresentationSettings } from '../main/display-types';
+import type { DisplayView, MeaningLang, PresentationSettings } from '../main/display-types';
 
 interface PresentStatus {
   projector: {
@@ -482,7 +482,9 @@ function renderView(v: DisplayView): void {
   $<HTMLInputElement>('font-scale').value = String(st.fontScale);
   radio('theme', st.theme);
   radio('hindi', st.hindi);
-  radio('meaning', st.meaning);
+  for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="meaning"]'))) {
+    el.checked = st.meaning.includes(el.value as MeaningLang);
+  }
   $<HTMLInputElement>('opt-vishraam').checked = st.vishraam;
   $<HTMLInputElement>('opt-larivaar').checked = st.larivaar;
   $<HTMLInputElement>('opt-next').checked = st.nextLine;
@@ -572,7 +574,12 @@ $('proj-display').addEventListener('change', (e) => {
 $('font-scale').addEventListener('input', (e) => setting({ fontScale: Number((e.target as HTMLInputElement).value) }));
 onRadio('theme', (v) => setting({ theme: v as PresentationSettings['theme'] }));
 onRadio('hindi', (v) => setting({ hindi: v as PresentationSettings['hindi'] }));
-onRadio('meaning', (v) => setting({ meaning: v as PresentationSettings['meaning'] }));
+for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="meaning"]'))) {
+  el.addEventListener('change', () => {
+    const on = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="meaning"]:checked'));
+    setting({ meaning: on.map((x) => x.value as MeaningLang) });
+  });
+}
 $('opt-vishraam').addEventListener('change', (e) => setting({ vishraam: (e.target as HTMLInputElement).checked }));
 $('opt-larivaar').addEventListener('change', (e) => setting({ larivaar: (e.target as HTMLInputElement).checked }));
 $('opt-next').addEventListener('change', (e) => setting({ nextLine: (e.target as HTMLInputElement).checked }));

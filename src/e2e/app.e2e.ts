@@ -332,17 +332,30 @@ describe('Kirtan Saathi app', () => {
     await pick('hindi', 'off');
     await until('Gurmukhi only', () => cur.locator('.hi').count(), (n) => n === 0);
 
-    await pick('meaning', 'pa');
+    // Meanings: any of Punjabi, Hindi and English, in that order.
+    const meaning = (lang: string) => page().click(`label:has(input[name="meaning"][value="${lang}"])`);
+    const shown = () => cur.locator('.arth > div').evaluateAll((d) => d.map((x) => x.className));
+    await meaning('pa');
     const v = await until('the Punjabi arth', now, (x) => !!x.current?.pa);
-    assert.match(v.credit, /^Arth: /);
+    assert.equal(v.credit, 'Arth: Prof. Sahib Singh');
     await until('the arth under the tuk', async () => (await cur.locator('.arth-pa').textContent()) ?? '', (t) => t.length > 0);
-    await pick('meaning', 'hi');
-    await until('the arth in Hindi', async () => (await cur.locator('.arth-hi').textContent()) ?? '', (t) => /[\u0900-\u097F]/.test(t));
-    assert.equal(await cur.locator('.arth-pa').count(), 0);
-    await pick('meaning', 'both');
-    await until('both meanings', async () => (await cur.locator('.arth-pa').count()) + (await cur.locator('.arth-hi').count()), (n) => n === 2);
-    await pick('meaning', 'off');
+    await meaning('en');
+    const ve = await until('Punjabi and English', now, (x) => x.settings.meaning.join() === 'pa,en');
+    assert.match(ve.current?.en ?? '', /[A-Za-z]{3}/, 'an English translation for this Sri Guru Granth Sahib line');
+    assert.equal(ve.credit, 'Arth: Prof. Sahib Singh · Translation: Dr. Sant Singh Khalsa');
+    await until('English under the Punjabi arth', shown, (c) => c.join() === 'arth-pa,arth-en');
+    assert.equal(((await cur.locator('.arth-en').textContent()) ?? '').trim(), ve.current?.en);
+    await until('both credits on the source line', async () => (await preview().locator('#source').textContent()) ?? '', (t) => t.endsWith('Arth: Prof. Sahib Singh · Translation: Dr. Sant Singh Khalsa'));
+    await meaning('pa');
+    await until('English only', shown, (c) => c.join() === 'arth-en');
+    assert.equal((await now()).credit, 'Translation: Dr. Sant Singh Khalsa');
+    await meaning('hi');
+    await until('Hindi before English', shown, (c) => c.join() === 'arth-hi,arth-en');
+    assert.match((await cur.locator('.arth-hi').textContent()) ?? '', /[\u0900-\u097F]/);
+    await meaning('hi');
+    await meaning('en');
     await until('no meaning', () => cur.locator('.arth').count(), (n) => n === 0);
+    assert.deepEqual((await now()).settings.meaning, []);
 
     const toggle = (id: string) => page().click(`label:has(#${id})`);
     const spaces = async () => ((await cur.locator('.gu').textContent()) ?? '').trim().split(' ').length - 1;
@@ -434,9 +447,18 @@ describe('Kirtan Saathi app', () => {
       await phone.click('#script');
       assert.equal((await phone.locator('#script').textContent())?.trim(), 'ਗੁ + हि');
       await until('Hindi on the phone', async () => (await phone.locator('#lines').textContent()) ?? '', (t) => /[\u0900-\u097F]/.test(t));
+      // The reader's own meaning, even with the projector's meanings off.
+      const arth = async () => (await phone.locator('#arth').textContent())?.trim();
       await phone.click('#arth');
-      assert.equal((await phone.locator('#arth').textContent())?.trim(), 'ਅਰਥ');
-      assert.equal((await now()).settings.meaning, 'off', "a phone's choices do not change the projector");
+      assert.equal(await arth(), 'ਅਰਥ');
+      await until('the Punjabi arth on the phone', () => phone.locator('#lines li.current .arth-pa').count(), (n) => n === 1);
+      await phone.click('#arth');
+      await phone.click('#arth');
+      assert.equal(await arth(), 'EN');
+      await until('English on the phone', async () => (await phone.locator('#lines li.current .arth-en').textContent()) ?? '', (t) => /[A-Za-z]{3}/.test(t));
+      assert.match((await phone.locator('#follow-source').textContent()) ?? '', /Translation: Dr\. Sant Singh Khalsa$/);
+      assert.deepEqual((await now()).settings.meaning, [], "a phone's choices do not change the projector");
+      assert.equal(await preview().locator('#current .arth').count(), 0, 'the projector shows no meaning');
 
       // OBS overlay: same view, overlay layout.
       await phone.goto(`${k.base}/overlay`);
@@ -512,7 +534,7 @@ describe('Kirtan Saathi app', () => {
     const s = (await now()).settings;
     assert.equal(s.theme, 'dark');
     assert.equal(s.fontScale, 1.5);
-    assert.equal(s.meaning, 'off');
+    assert.deepEqual(s.meaning, []);
     assert.equal(await page().isChecked('input[name="theme"][value="dark"]'), true);
     assert.equal(await page().inputValue('#font-scale'), '1.5');
     assert.equal(await page().isChecked('#opt-lan'), false);
