@@ -210,6 +210,8 @@ jobs:
         shell: pwsh
         env:
           E2E_OUT: smoke/e2e
+          # The installed app must be able to update itself (checked, not skipped).
+          E2E_EXPECT_SELF_UPDATE: '1'
         run: |
           $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Kirtan Saathi.exe' | Select-Object -First 1
           $env:KIRTAN_APP = $exe.FullName

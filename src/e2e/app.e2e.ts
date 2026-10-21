@@ -558,6 +558,8 @@ describe('Kirtan Saathi app', () => {
 
   check('downloads the update where the app can update itself', async () => {
     const st = await updates();
+    // The installers workflow sets this for the installed Windows app, so self-update cannot quietly turn off.
+    if (process.env.E2E_EXPECT_SELF_UPDATE === '1') assert.equal(st.canInstall, true, 'the installed app can update itself');
     if (!st.canInstall) {
       // Development runs, .deb and macOS: the release page instead (opening a browser is not tested).
       assert.equal(await page().isVisible('#update-download'), true);
@@ -567,7 +569,9 @@ describe('Kirtan Saathi app', () => {
     releases.feed = { version: '99.0.0', payload: randomBytes(512 * 1024) };
     assert.equal(await text('#update-install'), 'Update now');
     await page().click('#update-install');
-    await until('the download to finish', () => text('#update-state'), (t) => t === 'Version 99.0.0 is downloaded. It installs when you close Kirtan Saathi.', 60_000);
+    const done = await until('the download to finish or fail', updates, (s) => s.state === 'ready' || !!s.message, 60_000);
+    assert.equal(done.message, '', 'the download did not fail');
+    assert.equal(await text('#update-state'), 'Version 99.0.0 is downloaded. It installs when you close Kirtan Saathi.');
     assert.equal(await text('#update-title'), 'Kirtan Saathi 99.0.0 is ready to install');
     assert.equal(await text('#update-install'), 'Restart and update');
     assert.equal(await page().isHidden('#update-download'), true);

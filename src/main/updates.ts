@@ -16,6 +16,8 @@
  */
 import { app, net } from 'electron';
 import { EventEmitter } from 'node:events';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { AppUpdater } from 'electron-updater';
 import { compareVersions, latestRelease, RELEASES_API, RELEASES_PAGE, type UpdatePrefs, type UpdateStatus } from './update-check';
 
@@ -24,7 +26,8 @@ const EVERY_MS = 6 * 3600_000;
 /** Whether this copy of the app can replace itself. */
 function canSelfUpdate(): boolean {
   if (!app.isPackaged) return false;
-  if (process.platform === 'win32') return true;
+  // Installed by the setup wizard, which leaves its uninstaller next to the app (not a copied folder).
+  if (process.platform === 'win32') return existsSync(join(dirname(process.execPath), `Uninstall ${app.getName()}.exe`));
   if (process.platform === 'linux') return !!process.env.APPIMAGE;
   return false;
 }
