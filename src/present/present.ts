@@ -8,16 +8,16 @@
  *
  * Overlay query parameters: size (multiplier), position (bottom|top|center),
  * box (1|0), next (1|0), source (1|0), color (hex without #),
- * hindi (off|below|only), meaning (off|pa|hi|both).
+ * hindi (off|below|only), meaning (off, or any of pa, hi, en as a comma list, e.g. pa,en).
  */
-import type { DisplayLine, DisplayView } from '../main/display-types';
-import { toDevanagari, tokens } from './format.js';
+import type { DisplayLine, DisplayView, MeaningLang } from '../main/display-types';
+import { creditText, parseMeaning, toDevanagari, tokens } from './format.js';
 
 type Layout = 'projector' | 'overlay' | 'follow';
 type Hindi = 'off' | 'below' | 'only';
 const HINDI: Hindi[] = ['off', 'below', 'only'];
-type Meaning = 'off' | 'pa' | 'hi' | 'both';
-const MEANING: Meaning[] = ['off', 'pa', 'hi', 'both'];
+/** Follow page: the reader's Arth button steps through these. */
+const MEANING_CYCLE: MeaningLang[][] = [[], ['pa'], ['hi'], ['en'], ['pa', 'hi'], ['pa', 'en']];
 
 const ROLE_RAHAO = 1;
 const ROLE_HEADER = 2;
@@ -53,11 +53,11 @@ let lastFollowShabad = '';
 let userScrolledAt = 0;
 /** Follow page: the reader's own Hindi choice (null = use the operator's). */
 let localHindi: Hindi | null = null;
-let localMeaning: Meaning | null = null;
+let localMeaning: MeaningLang[] | null = null;
 
-function meaningMode(v: DisplayView): Meaning {
-  const q = query.get('meaning') as Meaning | null;
-  if (q && MEANING.includes(q)) return q;
+function meaningMode(v: DisplayView): MeaningLang[] {
+  const q = query.get('meaning');
+  if (q !== null) return parseMeaning(q);
   if (layout === 'follow' && localMeaning) return localMeaning;
   return v.settings.meaning;
 }
@@ -85,31 +85,25 @@ function appendTokens(el: HTMLElement, text: string, hindi: boolean): void {
  * Render a line into `el`: Gurmukhi and / or Hindi (Devanagari), with
  * vishraam colouring and larivaar per settings.
  */
-function renderLine(el: HTMLElement, line: DisplayLine | null, hindi: Hindi, meaning: Meaning = 'off'): void {
+function renderLine(el: HTMLElement, line: DisplayLine | null, hindi: Hindi, meaning: MeaningLang[] = []): void {
   el.textContent = '';
   if (!line || !view) return;
   renderTuk(el, line, hindi);
-  // Meaning (arth) just under the tuk, smaller.
-  const pa = line.pa ?? '';
-  if (meaning === 'off' || !pa) return;
+  // Meanings just under the tuk, smaller: Punjabi arth, Hindi, English.
   const arth = document.createElement('div');
   arth.className = 'arth';
-  if (meaning === 'pa' || meaning === 'both') {
+  for (const lang of meaning) {
+    const pa = line.pa ?? '';
+    // Hindi: a bundled Hindi translation when there is one, else the Punjabi arth in Hindi script.
+    const text = lang === 'pa' ? pa : lang === 'hi' ? line.hi || (pa ? toDevanagari(pa) : '') : line.en ?? '';
+    if (!text) continue;
     const d = document.createElement('div');
-    d.className = 'arth-pa';
-    d.lang = 'pa';
-    d.textContent = pa;
+    d.className = `arth-${lang}`;
+    d.lang = lang;
+    d.textContent = text;
     arth.append(d);
   }
-  if (meaning === 'hi' || meaning === 'both') {
-    const d = document.createElement('div');
-    d.className = 'arth-hi';
-    d.lang = 'hi';
-    // A bundled Hindi translation when there is one, else the Punjabi arth in Hindi script.
-    d.textContent = line.hi || toDevanagari(pa);
-    arth.append(d);
-  }
-  el.append(arth);
+  if (arth.childElementCount) el.append(arth);
 }
 
 function renderTuk(el: HTMLElement, line: DisplayLine, hindi: Hindi): void {
@@ -172,7 +166,7 @@ function renderStage(v: DisplayView): void {
   cur.classList.toggle('waheguru', idle);
   cur.classList.toggle('rahao', v.current?.role === ROLE_RAHAO);
   renderLine(next, showNext(v) ? v.next : null, hindi);
-  src.textContent = showSource(v) && !idle ? [v.source, meaningMode(v) !== 'off' ? v.credit : ''].filter(Boolean).join(' · ') : '';
+  src.textContent = showSource(v) && !idle ? [v.source, creditText(v.credits, meaningMode(v))].filter(Boolean).join(' · ') : '';
   stage.classList.toggle('empty', !v.current && !idle);
   if (layout === 'projector') {
     fit(cur, window.innerHeight * (next.textContent ? 0.55 : 0.75));
@@ -192,7 +186,7 @@ function renderFollow(v: DisplayView): void {
   const list = $('lines');
   const hindi = hindiMode(v);
   const meaning = meaningMode(v);
-  const key = `${v.lines[0]?.line ?? ''}|${v.settings.larivaar}|${v.settings.vishraam}|${hindi}|${meaning}|${v.lines[0]?.pa !== undefined}`;
+  const key = `${v.lines[0]?.line ?? ''}|${v.settings.larivaar}|${v.settings.vishraam}|${hindi}|${meaning.join(',')}|${v.lines[0]?.pa !== undefined}`;
   if (key !== lastFollowShabad) {
     lastFollowShabad = key;
     list.textContent = '';
@@ -206,7 +200,7 @@ function renderFollow(v: DisplayView): void {
     }
     window.scrollTo({ top: 0 });
   }
-  $('follow-source').textContent = [v.source, meaning !== 'off' ? v.credit : ''].filter(Boolean).join(' · ') || 'Waiting for the shabad…';
+  $('follow-source').textContent = [v.source, creditText(v.credits, meaning)].filter(Boolean).join(' · ') || 'Waiting for the shabad…';
   let current: HTMLElement | null = null;
   for (const li of Array.from(list.children) as HTMLElement[]) {
     const on = v.current !== null && li.dataset.line === String(v.current.line);
@@ -291,23 +285,25 @@ if (layout === 'follow') {
     if (view) renderFollow(view);
     label();
   });
-  // Meaning: each reader can choose off / Punjabi / Hindi / both.
+  // Meaning: each reader can choose off, Punjabi, Hindi, English, or two of them.
   const meaningKey = 'ks-follow-meaning';
   try {
-    const saved = localStorage.getItem(meaningKey) as Meaning | null;
-    if (saved && MEANING.includes(saved)) localMeaning = saved;
+    const saved = localStorage.getItem(meaningKey);
+    if (saved !== null) localMeaning = parseMeaning(saved);
   } catch {
     /* storage unavailable */
   }
   const meaningLabel = () => {
-    const mode = view ? meaningMode(view) : localMeaning ?? 'off';
-    $('arth').textContent = { off: 'ਅਰਥ ✕', pa: 'ਅਰਥ', hi: 'अर्थ', both: 'ਅਰਥ+अर्थ' }[mode];
+    const mode = view ? meaningMode(view) : localMeaning ?? [];
+    const names = { pa: 'ਅਰਥ', hi: 'अर्थ', en: 'EN' };
+    $('arth').textContent = mode.length ? mode.map((m) => names[m]).join('+') : 'ਅਰਥ ✕';
   };
   $('arth').addEventListener('click', () => {
-    const cur = view ? meaningMode(view) : 'off';
-    localMeaning = MEANING[(MEANING.indexOf(cur) + 1) % MEANING.length];
+    const cur = (view ? meaningMode(view) : []).join(',');
+    const i = MEANING_CYCLE.findIndex((m) => m.join(',') === cur);
+    localMeaning = MEANING_CYCLE[(i + 1) % MEANING_CYCLE.length];
     try {
-      localStorage.setItem(meaningKey, localMeaning);
+      localStorage.setItem(meaningKey, localMeaning.join(',') || 'off');
     } catch {
       /* not persisted */
     }

@@ -9,8 +9,12 @@ export interface MeaningLookup {
   pa(line: number): string;
   /** Hindi translation ('' when none is bundled). */
   hi(line: number): string;
+  /** English translation ('' when none). */
+  en(line: number): string;
   /** Short credit for the line's Punjabi arth, e.g. "Prof. Sahib Singh". */
   credit(line: number): string;
+  /** Short credit for the line's English translation, e.g. "Dr. Sant Singh Khalsa". */
+  enCredit(line: number): string;
 }
 
 interface MeaningsFile {
@@ -18,6 +22,9 @@ interface MeaningsFile {
   pa: string[];
   paSource: number[];
   hi?: string[];
+  enSources?: { id: string; name: string }[];
+  en?: string[];
+  enSource?: number[];
 }
 
 export class Meanings implements MeaningLookup {
@@ -40,8 +47,17 @@ export class Meanings implements MeaningLookup {
     return this.file.hi?.[line] ?? '';
   }
 
+  en(line: number): string {
+    return this.file.en?.[line] ?? '';
+  }
+
   credit(line: number): string {
     const s = this.file.sources[this.file.paSource[line] ?? -1];
+    return s ? s.name.split(',')[0] : '';
+  }
+
+  enCredit(line: number): string {
+    const s = this.file.enSources?.[this.file.enSource?.[line] ?? -1];
     return s ? s.name.split(',')[0] : '';
   }
 }

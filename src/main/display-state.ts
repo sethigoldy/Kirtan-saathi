@@ -8,6 +8,7 @@ import { EventEmitter } from 'node:events';
 import type { MeaningLookup } from './meanings';
 
 import { DEFAULT_SETTINGS, type DisplayLine, type DisplayReport, type DisplayView, type PresentationSettings } from './display-types';
+import { creditText, parseMeaning } from '../present/format';
 
 export { DEFAULT_SETTINGS };
 export type { DisplayLine, DisplayReport, DisplayShabad, DisplayView, PresentationSettings } from './display-types';
@@ -71,11 +72,13 @@ export class DisplayState extends EventEmitter {
           .filter(Boolean)
           .join(' · ')
       : '';
-    const withMeaning = this.settingsValue.meaning !== 'off' && this.meanings !== null;
+    // Lines always carry every language: the projector shows the operator's
+    // choice, and each phone its reader's own.
+    const withMeaning = this.meanings !== null;
     const m = this.meanings;
     const add = (l: DisplayLine | null): DisplayLine | null =>
-      l && withMeaning ? { ...l, pa: m!.pa(l.line), hi: m!.hi(l.line) } : l;
-    const credit = withMeaning && current ? m!.credit(current.line) : '';
+      l && withMeaning ? { ...l, pa: m!.pa(l.line), hi: m!.hi(l.line), en: m!.en(l.line) } : l;
+    const credits = withMeaning && current ? { arth: m!.credit(current.line), translation: m!.enCredit(current.line) } : { arth: '', translation: '' };
     return {
       seq: this.seq,
       blank: this.blank,
@@ -85,7 +88,8 @@ export class DisplayState extends EventEmitter {
       current: add(current),
       next,
       lines: withMeaning ? (s?.lines ?? []).map((l) => add(l)!) : s?.lines ?? [],
-      credit: credit ? `Arth: ${credit}` : '',
+      credit: creditText(credits, this.settingsValue.meaning),
+      credits,
       settings: this.settingsValue,
     };
   }
@@ -105,7 +109,7 @@ function sanitize(s: PresentationSettings): PresentationSettings {
     waheguru: !!s.waheguru,
     fontScale: Math.min(2.5, Math.max(0.5, Number(s.fontScale) || 1)),
     hindi: s.hindi === 'below' || s.hindi === 'only' ? s.hindi : 'off',
-    meaning: s.meaning === 'pa' || s.meaning === 'hi' || s.meaning === 'both' ? s.meaning : 'off',
+    meaning: parseMeaning(s.meaning),
     theme: s.theme === 'dark' || s.theme === 'light' || s.theme === 'saffron' ? s.theme : 'khanda',
   };
 }
