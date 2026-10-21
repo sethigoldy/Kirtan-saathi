@@ -243,10 +243,24 @@ describe('Kirtan Saathi app', () => {
     await until('the preview to show it', async () => plain(await preview().locator('#current .gu').textContent()), (t) => t === plain(POTHI));
   });
 
-  check('lists the shabad chosen in Find in the operator window', async () => {
-    await until('the operator shabad list', async () => (await page().$$('#lines li')).length, (n) => n > 0, 5_000);
+  check('lists the shabad chosen in Find in the operator window and follows Next and clicks', async () => {
+    const v = await now();
+    const chosen = v.current!.line;
+    await until('the operator shabad list', async () => (await page().$$('#lines li')).length, (n) => n === v.lines.length, 5_000);
     assert.equal(await page().isHidden('#guide'), true);
-  }, { todo: 'the operator list only updates on engine events, which need audio; the projector and phones do show the shabad' });
+    const highlighted = () => page().$eval('#lines li.current', (l) => Number((l as HTMLElement).dataset.line)).catch(() => null);
+    await until('the chosen line highlighted', highlighted, (l) => l === chosen);
+    await page().click('#next');
+    const next = (await until('the next line', now, (x) => x.current?.line !== chosen)).current!.line;
+    await until('Next to move the highlight', highlighted, (l) => l === next);
+    const lines = await page().$$eval('#lines li:not(.header):not(.current)', (l) => l.map((x) => Number((x as HTMLElement).dataset.line)));
+    const other = lines[lines.length - 1];
+    await page().click(`#lines li[data-line="${other}"]`);
+    await until('the clicked line on screen', now, (x) => x.current?.line === other);
+    await until('the click to move the highlight', highlighted, (l) => l === other);
+    await page().click(`#lines li[data-line="${chosen}"]`);
+    await until('back to the chosen line', now, (x) => x.current?.line === chosen);
+  });
 
   check('moves between lines with the buttons and arrow keys', async () => {
     const start = (await now()).current!.line;
