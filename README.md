@@ -156,7 +156,7 @@ All outputs render the same display state, so they always show the same line. A 
 | Output | How | Notes |
 |---|---|---|
 | **Projector** | **Projector → Show** | Fullscreen on the chosen screen. The app remembers the screen. If that screen is unplugged, the projector closes rather than covering the operator's screen, and it reopens when the screen returns. The display is kept awake. **Esc** closes it. |
-| **OBS overlay** | Browser source, `/overlay`, 1920 × 1080 | Transparent lower third. Query options: `size`, `position=top\|center\|bottom`, `box=0`, `next=0\|1`, `source=0\|1`, `color=ffffff`, `hindi=off\|below\|only`, `meaning=off\|pa\|hi\|both` |
+| **OBS overlay** | Browser source, `/overlay`, 1920 × 1080 | Transparent lower third. Query options: `size`, `position=top\|center\|bottom`, `box=0`, `next=0\|1`, `source=0\|1`, `waheguru=0\|1`, `color=ffffff`, `hindi=off\|below\|only`, `meaning=off\|pa\|hi\|both` |
 | **Phones** | Tick *Let phones on this Wi-Fi follow along* | `/follow` shows the whole shabad with the live line highlighted. Readers set text size, script and meaning on their own phone. |
 
 The operator window shows a live preview of the projector. Controls:
@@ -170,6 +170,7 @@ Presentation settings live under *Projector*:
 - **Theme:** *Light with Khanda* (default), Dark, Blue and saffron, or Light.
 - **Vishraam colours** and **larivaar.**
 - **Next line** and **source line.**
+- **ਵਾਹਿਗੁਰੂ while searching** (on by default): the projector and overlay show ਵਾਹਿਗੁਰੂ until the first line is found, after **Search again**, and when the mode changes. **Blank** still blanks every output.
 - **Hindi (Devanagari):** off, under the Gurmukhi, or instead of it.
 - **Meaning (arth):** Punjabi, Hindi script, or both, shown smaller under the tuk.
 

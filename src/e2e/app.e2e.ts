@@ -101,6 +101,7 @@ describe('Kirtan Saathi app', () => {
     assert.equal(v.blank, false);
     assert.equal(v.current, null, 'nothing on screen before listening');
     assert.equal(v.settings.theme, 'khanda', 'default colours');
+    assert.equal(v.settings.waheguru, true, 'ਵਾਹਿਗੁਰੂ while searching is on by default');
     // Live updates (Server-Sent Events) start with the current view.
     const ctl = new AbortController();
     const events = await fetch(`${k.base}/events`, { signal: ctl.signal });
@@ -460,10 +461,21 @@ describe('Kirtan Saathi app', () => {
 
   // ---------- Search again, recordings ----------
 
-  check('Search again clears the screens', async () => {
+  check('Search again clears the line and shows ਵਾਹਿਗੁਰੂ while searching', async () => {
     await page().click('#reset');
     await until('the screens to clear', now, (v) => v.current === null);
-    await until('the preview to clear', () => preview().locator('#stage').getAttribute('class'), (c) => /\bempty\b/.test(c ?? ''));
+    const shown = async () => ((await preview().locator('#current').textContent()) ?? '').trim();
+    await until('ਵਾਹਿਗੁਰੂ on the preview', shown, (t) => t === 'ਵਾਹਿਗੁਰੂ');
+    assert.equal(((await preview().locator('#source').textContent()) ?? '').trim(), '', 'no source line under ਵਾਹਿਗੁਰੂ');
+    await page().click('label:has(#opt-waheguru)');
+    await until('the switch off', async () => (await now()).settings.waheguru, (w) => !w);
+    await until('an empty preview', () => preview().locator('#stage').getAttribute('class'), (c) => /\bempty\b/.test(c ?? ''));
+    await page().click('label:has(#opt-waheguru)');
+    await until('ਵਾਹਿਗੁਰੂ back', shown, (t) => t === 'ਵਾਹਿਗੁਰੂ');
+    await page().click('#blank');
+    await until('Blank to hide ਵਾਹਿਗੁਰੂ too', () => preview().locator('html').getAttribute('class'), (c) => /\bblank\b/.test(c ?? ''));
+    await page().click('#blank');
+    await until('the screens to show again', now, (v) => !v.blank);
   });
 
   check('follows a recording file', async () => {

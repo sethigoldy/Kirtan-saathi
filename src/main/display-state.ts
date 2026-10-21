@@ -102,6 +102,7 @@ function sanitize(s: PresentationSettings): PresentationSettings {
     vishraam: !!s.vishraam,
     nextLine: !!s.nextLine,
     showSource: !!s.showSource,
+    waheguru: !!s.waheguru,
     fontScale: Math.min(2.5, Math.max(0.5, Number(s.fontScale) || 1)),
     hindi: s.hindi === 'below' || s.hindi === 'only' ? s.hindi : 'off',
     meaning: s.meaning === 'pa' || s.meaning === 'hi' || s.meaning === 'both' ? s.meaning : 'off',

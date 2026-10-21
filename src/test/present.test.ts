@@ -60,6 +60,9 @@ test('display state emits only on real changes and hides next in kirtan', () => 
   assert.equal(seen.length, 3);
   assert.equal(seen.at(-1)!.blank, true);
 
+  assert.equal(d.settings.waheguru, true, 'ਵਾਹਿਗੁਰੂ shows while searching by default');
+  assert.equal(d.updateSettings({ waheguru: false }).waheguru, false);
+
   const s = d.updateSettings({ fontScale: 9, theme: 'nope' as never, hindi: 'x' as never, meaning: 'y' as never });
   assert.equal(s.fontScale, 2.5);
   assert.equal(s.theme, 'khanda', 'invalid theme falls back to the default');
@@ -184,6 +187,7 @@ test('settings survive a damaged file and keep valid values', () => {
   assert.equal(s.server.lan, false);
   assert.match(s.server.pin, /^\d{4}$/);
   assert.deepEqual(s.projector, { enabled: true, displayId: 42 });
+  assert.equal(parseSettings({ presentation: { theme: 'dark' } }).presentation.waheguru, true, 'settings saved before ਵਾਹਿਗੁਰੂ existed get it on');
 
   const dir = mkdtempSync(join(tmpdir(), 'ks-settings-'));
   const file = join(dir, 'settings.json');
