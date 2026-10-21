@@ -8,7 +8,7 @@ import { EventEmitter } from 'node:events';
 import type { MeaningLookup } from './meanings';
 
 import { DEFAULT_SETTINGS, type DisplayLine, type DisplayReport, type DisplayView, type PresentationSettings } from './display-types';
-import { creditText, parseMeaning } from '../present/format';
+import { creditText, pageText, parseMeaning, sectionPa } from '../present/format';
 
 export { DEFAULT_SETTINGS };
 export type { DisplayLine, DisplayReport, DisplayShabad, DisplayView, PresentationSettings } from './display-types';
@@ -67,8 +67,13 @@ export class DisplayState extends EventEmitter {
       next = r.next ?? (s ? s.lines[s.lines.indexOf(current) + 1] ?? null : null);
     }
     // The author (Guru Sahib / Bhagat) is deliberately not shown with the tuk.
+    const pa = this.settingsValue.language === 'pa';
+    const stream = r.stream && r.stream !== s?.source ? (pa ? r.streamPa || r.stream : r.stream) : '';
     const source = s
-      ? [r.stream && r.stream !== s.source ? r.stream : '', s.source, s.section, s.page > 0 ? `${/Granth/.test(s.source) ? 'Ang' : 'page'} ${s.page}` : '']
+      ? (pa
+          ? [stream, s.sourcePa || s.source, sectionPa(s.section), pageText(s.source, s.page, 'pa')]
+          : [stream, s.source, s.section, pageText(s.source, s.page)]
+        )
           .filter(Boolean)
           .join(' · ')
       : '';
@@ -88,7 +93,7 @@ export class DisplayState extends EventEmitter {
       current: add(current),
       next,
       lines: withMeaning ? (s?.lines ?? []).map((l) => add(l)!) : s?.lines ?? [],
-      credit: creditText(credits, this.settingsValue.meaning),
+      credit: creditText(credits, this.settingsValue.meaning, this.settingsValue.language),
       credits,
       settings: this.settingsValue,
     };
@@ -111,5 +116,6 @@ function sanitize(s: PresentationSettings): PresentationSettings {
     hindi: s.hindi === 'below' || s.hindi === 'only' ? s.hindi : 'off',
     meaning: parseMeaning(s.meaning),
     theme: s.theme === 'dark' || s.theme === 'light' || s.theme === 'saffron' ? s.theme : 'khanda',
+    language: s.language === 'pa' ? 'pa' : 'en',
   };
 }

@@ -13,6 +13,8 @@ import { rmSync } from 'node:fs';
 import { after, before, describe, it } from 'node:test';
 import type { Page } from 'playwright-core';
 import type { UpdateStatus } from '../main/update-check';
+import { gurmukhiDigits } from '../present/format';
+import { translate } from '../present/ui-words';
 import { JAPJI_WAV, launch, launchSecond, plain, releases, sleep, snap, state, until, VERSION, type App } from './harness';
 
 const LONG = 240_000;
@@ -501,6 +503,68 @@ describe('Kirtan Saathi app', () => {
     await until('Wi-Fi sharing off', () => text('#lan-urls'), (t) => t === '');
     assert.equal(await page().isChecked('#opt-lan'), false);
     await until('the server on this computer', () => fetch(`${k.base}/api/state`), (r) => r.status === 200);
+    await page().click('[data-tab="screen"]');
+  });
+
+  // ---------- Punjabi app ----------
+
+  check('switches the whole app to Punjabi and back', async () => {
+    const language = (value: string) => page().click(`label:has(input[name="language"][value="${value}"])`);
+    const previewSource = async () => ((await preview().locator('#source').textContent()) ?? '').trim();
+    const gurmukhiOnly = (t: string) => /[\u0A00-\u0A7F]/.test(t) && !/[A-Za-z]/.test(t);
+    const v = await now();
+    assert.match(v.source, /^Sri Guru Granth Sahib · .+ · Ang \d+$/, 'a Sri Guru Granth Sahib shabad is shown');
+
+    await page().click('[data-tab="app"]');
+    await language('pa');
+    try {
+      await until('the Punjabi app', now, (x) => x.settings.language === 'pa');
+      await until('Punjabi tabs', () => text('[data-tab="screen"]'), (t) => t === 'ਸਕਰੀਨ');
+      assert.equal(await text('[data-tab="app"]'), 'ਐਪ');
+      assert.equal(await text('#mic'), 'ਸੁਣਨਾ ਸ਼ੁਰੂ ਕਰੋ');
+      assert.ok(gurmukhiOnly(await text('#status-text')), `status in Punjabi: ${await text('#status-text')}`);
+      assert.equal(await page().getAttribute('#prev', 'title'), 'ਪਿਛਲੀ ਤੁਕ (ਖੱਬਾ ਤੀਰ)', 'tooltips too');
+      assert.equal(await text('#app-version'), `ਕੀਰਤਨ ਸਾਥੀ ${gurmukhiDigits(VERSION)}`);
+      assert.equal(await page().locator('[data-mode="kirtan"] .en-only').isVisible(), false, 'no English beside ਕੀਰਤਨ');
+      assert.ok(await page().isVisible('#error'), 'the missing-input message from earlier is still shown');
+      assert.equal(await text('#error'), translate('pa', "No microphone was found. Plug in a microphone or the mixer's USB / line input, choose it in the input list, then press Start listening."));
+      await until('the shabad heading in Punjabi', () => text('#now-meta'), (t) => /^ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ .+, ਅੰਗ [੦-੯]+$/.test(t));
+
+      // Every screen: the source line in Gurmukhi, Gurbani unchanged.
+      const pa = await until('the source line in Gurmukhi', now, (x) => /^ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ · .+ · ਅੰਗ [੦-੯]+$/.test(x.source));
+      assert.ok(gurmukhiOnly(pa.source), pa.source);
+      assert.equal(pa.current?.text, v.current?.text, 'Gurbani is unchanged');
+      await until('the preview source line', previewSource, (t) => t === pa.source);
+
+      const opened = k.app.waitForEvent('window');
+      await k.app.evaluate(({ BrowserWindow }, url) => {
+        const w = new BrowserWindow({ width: 420, height: 800, show: false });
+        void w.loadURL(url);
+      }, `${k.base}/follow`);
+      const phone = await opened;
+      try {
+        const followSource = async () => ((await phone.locator('#follow-source').textContent()) ?? '').trim();
+        const arth = async () => ((await phone.locator('#arth').textContent()) ?? '').trim();
+        await until('the phone title in Punjabi', async () => ((await phone.locator('.follow-title strong').textContent()) ?? '').trim(), (t) => t === 'ਕੀਰਤਨ ਸਾਥੀ');
+        await until('the phone source line', followSource, (t) => t.startsWith(pa.source));
+        // The reader's own meaning choice is remembered on the phone: step to Punjabi + English, then back.
+        const was = await arth();
+        for (let i = 0; i < 6 && (await arth()) !== 'ਅਰਥ+EN'; i++) await phone.click('#arth');
+        await until('both credits in Gurmukhi', followSource, (t) => t === `${pa.source} · ਅਰਥ: ਪ੍ਰੋ. ਸਾਹਿਬ ਸਿੰਘ · ਅਨੁਵਾਦ: ਡਾ. ਸੰਤ ਸਿੰਘ ਖ਼ਾਲਸਾ`);
+        for (let i = 0; i < 6 && (await arth()) !== was; i++) await phone.click('#arth');
+      } finally {
+        await phone.close();
+      }
+    } finally {
+      await language('en');
+    }
+
+    await until('the English app', now, (x) => x.settings.language === 'en');
+    await until('English tabs', () => text('[data-tab="screen"]'), (t) => t === 'Screen');
+    assert.equal(await text('#mic'), 'Start listening');
+    assert.equal(await page().locator('[data-mode="kirtan"] .en-only').isVisible(), true);
+    await until('the English source line', previewSource, (t) => t === v.source);
+    assert.equal(await text('#app-version'), `Kirtan Saathi ${VERSION}`);
     await page().click('[data-tab="screen"]');
   });
 

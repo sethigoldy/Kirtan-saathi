@@ -11,7 +11,13 @@
  * hindi (off|below|only), meaning (off, or any of pa, hi, en as a comma list, e.g. pa,en).
  */
 import type { DisplayLine, DisplayView, MeaningLang } from '../main/display-types';
-import { creditText, parseMeaning, toDevanagari, tokens } from './format.js';
+import { creditText, parseMeaning, toDevanagari, tokens, type UiLanguage } from './format.js';
+
+/** The page's own words in the app's language. */
+const WORDS: Record<UiLanguage, { brand: string; waiting: string; live: string; offline: string }> = {
+  en: { brand: 'Kirtan Saathi', waiting: 'Waiting for the shabad…', live: 'Follow live line', offline: 'Reconnecting to Kirtan Saathi…' },
+  pa: { brand: 'ਕੀਰਤਨ ਸਾਥੀ', waiting: 'ਸ਼ਬਦ ਦੀ ਉਡੀਕ…', live: 'ਚੱਲ ਰਹੀ ਤੁਕ ਉੱਤੇ ਜਾਓ', offline: 'ਕੀਰਤਨ ਸਾਥੀ ਨਾਲ ਮੁੜ ਜੁੜ ਰਿਹਾ ਹੈ…' },
+};
 
 type Layout = 'projector' | 'overlay' | 'follow';
 type Hindi = 'off' | 'below' | 'only';
@@ -166,7 +172,7 @@ function renderStage(v: DisplayView): void {
   cur.classList.toggle('waheguru', idle);
   cur.classList.toggle('rahao', v.current?.role === ROLE_RAHAO);
   renderLine(next, showNext(v) ? v.next : null, hindi);
-  src.textContent = showSource(v) && !idle ? [v.source, creditText(v.credits, meaningMode(v))].filter(Boolean).join(' · ') : '';
+  src.textContent = showSource(v) && !idle ? [v.source, creditText(v.credits, meaningMode(v), v.settings.language)].filter(Boolean).join(' · ') : '';
   stage.classList.toggle('empty', !v.current && !idle);
   if (layout === 'projector') {
     fit(cur, window.innerHeight * (next.textContent ? 0.55 : 0.75));
@@ -200,7 +206,7 @@ function renderFollow(v: DisplayView): void {
     }
     window.scrollTo({ top: 0 });
   }
-  $('follow-source').textContent = [v.source, creditText(v.credits, meaning)].filter(Boolean).join(' · ') || 'Waiting for the shabad…';
+  $('follow-source').textContent = [v.source, creditText(v.credits, meaning, v.settings.language)].filter(Boolean).join(' · ') || (WORDS[v.settings.language] ?? WORDS.en).waiting;
   let current: HTMLElement | null = null;
   for (const li of Array.from(list.children) as HTMLElement[]) {
     const on = v.current !== null && li.dataset.line === String(v.current.line);
@@ -215,6 +221,10 @@ function renderFollow(v: DisplayView): void {
 function render(v: DisplayView): void {
   view = v;
   root.dataset.theme = v.settings.theme;
+  const words = WORDS[v.settings.language] ?? WORDS.en;
+  document.querySelector('.follow-title strong')!.textContent = words.brand;
+  $('live').textContent = words.live;
+  document.querySelector('.offline-note')!.textContent = words.offline;
   root.dataset.mode = v.mode;
   root.classList.toggle('blank', v.blank);
   root.style.setProperty('--scale', String(v.settings.fontScale));

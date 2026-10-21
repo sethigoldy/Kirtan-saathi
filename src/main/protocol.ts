@@ -24,6 +24,8 @@ export interface UiShabad {
   index: number;
   id: string;
   source: string;
+  /** Scripture name in Gurmukhi. */
+  sourcePa: string;
   section: string;
   author: string;
   page: number;
@@ -35,6 +37,8 @@ export interface UiCandidate {
   line: number;
   text: string;
   source: string;
+  /** Scripture name in Gurmukhi. */
+  sourcePa: string;
   page: number;
   score: number;
   evidence: number;

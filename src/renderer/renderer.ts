@@ -6,6 +6,8 @@
 import type { FromEngine, ToEngine, UiCandidate, UiEvent, UiShabad } from '../main/protocol';
 import type { DisplayView, MeaningLang, PresentationSettings } from '../main/display-types';
 import type { UpdatePrefs, UpdateStatus } from '../main/update-check';
+import { gurmukhiDigits, pageText, sectionPa, type UiLanguage } from '../present/format.js';
+import { HTML, translate } from '../present/ui-words.js';
 
 interface PresentStatus {
   projector: {
@@ -47,6 +49,20 @@ declare global {
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/** The app's own words: English or Punjabi (App → Language). */
+let lang: UiLanguage = 'en';
+const t = (text: string, ...args: (string | number)[]) => translate(lang, text, ...args);
+
+/** Put the window's marked words (static/index.html) in the current language. */
+function applyWords(): void {
+  document.documentElement.dataset.lang = lang;
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-i18n]'))) el.textContent = t(el.dataset.i18n!);
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-i18n-html]'))) el.innerHTML = HTML[el.dataset.i18nHtml!][lang];
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-i18n-title]'))) el.title = t(el.dataset.i18nTitle!);
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-i18n-aria-label]'))) el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel!));
+  for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('[data-i18n-placeholder]'))) el.placeholder = t(el.dataset.i18nPlaceholder!);
+}
+
 const ROLE_RAHAO = 1;
 const ROLE_HEADER = 2;
 const ROLE_MANGAL = 3;
@@ -82,15 +98,37 @@ function renderTuk(el: HTMLElement, text: string): void {
   }
 }
 
-function setStatus(state: 'idle' | 'listening' | 'searching' | 'locked' | 'error', label: string): void {
+/** English text for t() with its values, kept so it can be shown again in another language. */
+type Words = [string, ...(string | number)[]];
+
+let statusWords: Words = ['Starting…'];
+let errorWords: Words = [''];
+
+/** Status line. */
+function setStatus(state: 'idle' | 'listening' | 'searching' | 'locked' | 'error', label: string, ...args: (string | number)[]): void {
   $('status').className = `status status-${state}`;
-  $('status-text').textContent = label;
+  statusWords = [label, ...args];
+  $('status-text').textContent = t(label, ...args);
+}
+
+/** Error bar at the bottom. Engine errors pass their own message as {0}. */
+function showError(label: string, ...args: (string | number)[]): void {
+  errorWords = [label, ...args];
+  const el = $('error');
+  el.hidden = false;
+  el.textContent = t(label, ...args);
+  setStatus('error', 'Something needs attention');
 }
 
 /** Ang for the Granths, page for the other sources. */
 function pageLabel(source: string, page: number): string {
-  if (page <= 0) return '';
-  return /Granth/.test(source) ? `Ang ${page}` : `page ${page}`;
+  return pageText(source, page, lang);
+}
+
+/** Scripture or bani name in the app's language. */
+function sourceName(source: string, sourcePa?: string): string {
+  if (lang !== 'pa') return source;
+  return sourcePa || banis.find((b) => b.nameEn === source)?.name || source;
 }
 
 function renderShabad(): void {
@@ -126,18 +164,23 @@ function highlight(): void {
   meta.textContent = '';
   if (s) {
     const b = document.createElement('b');
-    b.textContent = streamName && streamName !== s.source ? streamName : s.source;
-    meta.append(b, ` ${[s.section, pageLabel(s.source, s.page)].filter(Boolean).join(', ')}`);
+    b.textContent = streamName && streamName !== s.source ? sourceName(streamName) : sourceName(s.source, s.sourcePa);
+    const section = lang === 'pa' ? sectionPa(s.section) : s.section;
+    meta.append(b, ` ${[section, pageLabel(s.source, s.page)].filter(Boolean).join(', ')}`);
   }
   $('guide').hidden = !!s;
 }
 
+/** Last lists shown, re-drawn when the language changes. */
+const lists = new Map<HTMLOListElement, [UiCandidate[], string]>();
+
 function renderCandidates(el: HTMLOListElement, items: UiCandidate[], emptyText: string): void {
+  lists.set(el, [items, emptyText]);
   el.textContent = '';
   if (!items.length) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = emptyText;
+    li.textContent = t(emptyText);
     el.append(li);
     return;
   }
@@ -149,10 +192,10 @@ function renderCandidates(el: HTMLOListElement, items: UiCandidate[], emptyText:
     const row = document.createElement('div');
     row.className = 'row';
     const info = document.createElement('span');
-    info.textContent = `${[c.source, pageLabel(c.source, c.page)].filter(Boolean).join(', ')} (${(c.score * 100).toFixed(0)}% match)`;
+    info.textContent = t('{0} ({1}% match)', [sourceName(c.source, c.sourcePa), pageLabel(c.source, c.page)].filter(Boolean).join(', '), (c.score * 100).toFixed(0));
     const btn = document.createElement('button');
-    btn.textContent = 'Show this';
-    btn.title = 'Show this shabad and keep it until Search again';
+    btn.textContent = t('Show this');
+    btn.title = t('Show this shabad and keep it until Search again');
     btn.addEventListener('click', () => send({ type: 'lock', shabad: c.shabad, line: c.line }));
     row.append(info, btn);
     li.append(text, row);
@@ -160,22 +203,26 @@ function renderCandidates(el: HTMLOListElement, items: UiCandidate[], emptyText:
   }
 }
 
-function renderStats(ev: UiEvent | null, ready?: Extract<FromEngine, { type: 'ready' }>): void {
+let readyMsg: Extract<FromEngine, { type: 'ready' }> | null = null;
+let lastEvent: UiEvent | null = null;
+let banis: { id: string; name: string; nameEn: string }[] = [];
+
+function renderStats(): void {
   const dl = $('stats');
-  const rows: [string, string][] = [];
+  const base: [string, string][] = [];
+  const ready = readyMsg;
   if (ready) {
-    rows.push(['Corpus', `${ready.lines.toLocaleString()} lines · ${ready.shabads.toLocaleString()} shabads`]);
-    rows.push(['Text source', ready.provenance]);
-    rows.push(['Threads', String(ready.threads)]);
-    rows.push(['Self-test RTF', ready.selfTestRtf.toFixed(3)]);
-    rows.push(['Load time', `${(ready.loadMs / 1000).toFixed(1)} s`]);
-    dl.dataset.ready = JSON.stringify(rows);
+    base.push([t('Corpus'), t('{0} lines · {1} shabads', ready.lines.toLocaleString(), ready.shabads.toLocaleString())]);
+    base.push([t('Text source'), ready.provenance]);
+    base.push([t('Threads'), String(ready.threads)]);
+    base.push([t('Self-test RTF'), ready.selfTestRtf.toFixed(3)]);
+    base.push([t('Load time'), t('{0} s', (ready.loadMs / 1000).toFixed(1))]);
   }
-  const base = dl.dataset.ready ? (JSON.parse(dl.dataset.ready) as [string, string][]) : [];
+  const ev = lastEvent;
   if (ev) {
-    base.push(['Decode', `${ev.inferMs.toFixed(0)} ms for ${ev.windowSec.toFixed(1)} s`]);
-    base.push(['Pace', `${ev.paceScale.toFixed(2)}×`]);
-    base.push(['Last action', ev.reason]);
+    base.push([t('Decode'), t('{0} ms for {1} s', ev.inferMs.toFixed(0), ev.windowSec.toFixed(1))]);
+    base.push([t('Pace'), `${ev.paceScale.toFixed(2)}×`]);
+    base.push([t('Last action'), ev.reason]);
   }
   dl.textContent = '';
   for (const [k, v] of base) {
@@ -187,31 +234,35 @@ function renderStats(ev: UiEvent | null, ready?: Extract<FromEngine, { type: 're
   }
 }
 
+function renderBanis(): void {
+  const sel = $<HTMLSelectElement>('bani');
+  const keep = sel.value;
+  sel.textContent = '';
+  for (const b of banis) {
+    const o = document.createElement('option');
+    o.value = b.id;
+    o.textContent = lang === 'pa' ? b.name : `${b.nameEn} (${b.name})`;
+    sel.append(o);
+  }
+  if (keep) sel.value = keep;
+}
+
 function onEngine(msg: FromEngine): void {
   switch (msg.type) {
     case 'ready': {
       setStatus('idle', 'Ready to listen');
       $<HTMLButtonElement>('mic').disabled = false;
-      const sel = $<HTMLSelectElement>('bani');
-      sel.textContent = '';
-      for (const b of msg.banis) {
-        const o = document.createElement('option');
-        o.value = b.id;
-        o.textContent = `${b.nameEn} (${b.name})`;
-        sel.append(o);
-      }
+      banis = msg.banis;
+      renderBanis();
       const japji = msg.banis.find((b) => /jap\s*ji/i.test(b.nameEn));
-      if (japji) sel.value = japji.id;
-      renderStats(null, msg);
+      if (japji) $<HTMLSelectElement>('bani').value = japji.id;
+      readyMsg = msg;
+      renderStats();
       break;
     }
-    case 'error': {
-      const el = $('error');
-      el.hidden = false;
-      el.textContent = msg.message;
-      setStatus('error', 'Something needs attention');
+    case 'error':
+      showError('{0}', msg.message);
       break;
-    }
     case 'shabad':
       shabad = msg.shabad;
       currentLine = null;
@@ -222,7 +273,7 @@ function onEngine(msg: FromEngine): void {
       // Locks report evidence rather than a probability, so cap at 100%.
       // A decode still in flight after Stop listening must not bring the status back.
       const live = $('mic').classList.contains('live');
-      if (live && ev.state === 'locked') setStatus('locked', `Following (${Math.round(Math.min(1, ev.confidence) * 100)}% sure)`);
+      if (live && ev.state === 'locked') setStatus('locked', 'Following ({0}% sure)', Math.round(Math.min(1, ev.confidence) * 100));
       else if (live && ev.state === 'searching') setStatus('searching', 'Listening for the shabad…');
       mode = ev.mode;
       streamName = ev.stream;
@@ -230,7 +281,8 @@ function onEngine(msg: FromEngine): void {
       highlight();
       renderCandidates($<HTMLOListElement>('candidates'), ev.candidates, 'None yet.');
       $('asr').textContent = ev.asrText;
-      renderStats(ev);
+      lastEvent = ev;
+      renderStats();
       break;
     }
     case 'line':
@@ -259,13 +311,13 @@ async function listDevices(): Promise<void> {
   for (const d of devices) {
     const o = document.createElement('option');
     o.value = d.deviceId;
-    o.textContent = d.label || `Input ${sel.length + 1}`;
+    o.textContent = d.label || t('Input {0}', sel.length + 1);
     sel.append(o);
   }
   if (!devices.length) {
     const o = document.createElement('option');
     o.value = '';
-    o.textContent = 'Default microphone';
+    o.textContent = t('Default microphone');
     sel.append(o);
   }
   if (keep && devices.some((d) => d.deviceId === keep)) sel.value = keep;
@@ -274,8 +326,8 @@ async function listDevices(): Promise<void> {
 /** Start / stop button reflects whether audio is flowing. */
 function listening(on: boolean): void {
   const b = $('mic');
-  b.textContent = on ? 'Stop listening' : 'Start listening';
   b.classList.toggle('live', on);
+  b.textContent = t(on ? 'Stop listening' : 'Start listening');
   if (on && !shabad) setStatus('listening', 'Listening for the shabad…');
   if (!on) setStatus('idle', 'Not listening');
 }
@@ -333,7 +385,7 @@ async function restartMic(): Promise<void> {
     $('error').hidden = true;
   } catch (err) {
     stopCapture();
-    onEngine({ type: 'error', message: micHelp(err as Error) });
+    showError(...micHelp(err as Error));
   }
 }
 
@@ -374,20 +426,20 @@ async function startFile(file: File): Promise<void> {
 }
 
 /** Plain-language help for the common microphone failures. */
-function micHelp(err: Error): string {
+function micHelp(err: Error): Words {
   const mac = navigator.userAgent.includes('Mac');
   if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
     return mac
-      ? 'Kirtan Saathi is not allowed to use the microphone. Open System Settings → Privacy & Security → Microphone, turn on Kirtan Saathi, then restart the app.'
-      : 'Kirtan Saathi is not allowed to use the microphone. Open Settings → Privacy & security → Microphone, turn on "Microphone access" and "Let desktop apps access your microphone", then try again.';
+      ? ['Kirtan Saathi is not allowed to use the microphone. Open System Settings → Privacy & Security → Microphone, turn on Kirtan Saathi, then restart the app.']
+      : ['Kirtan Saathi is not allowed to use the microphone. Open Settings → Privacy & security → Microphone, turn on "Microphone access" and "Let desktop apps access your microphone", then try again.'];
   }
   if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
-    return 'No microphone was found. Plug in a microphone or the mixer\'s USB / line input, choose it in the input list, then press Start listening.';
+    return ["No microphone was found. Plug in a microphone or the mixer's USB / line input, choose it in the input list, then press Start listening."];
   }
   if (err.name === 'NotReadableError') {
-    return 'The microphone is busy or was unplugged. Close other apps using it (Zoom, Skype, OBS audio capture) and try again.';
+    return ['The microphone is busy or was unplugged. Close other apps using it (Zoom, Skype, OBS audio capture) and try again.'];
   }
-  return `Microphone unavailable: ${err.message}`;
+  return ['Microphone unavailable: {0}', err.message];
 }
 
 function stopCapture(): void {
@@ -425,7 +477,7 @@ $('mic').addEventListener('click', async () => {
     listening(true);
     $('error').hidden = true;
   } catch (err) {
-    onEngine({ type: 'error', message: micHelp(err as Error) });
+    showError(...micHelp(err as Error));
   }
 });
 
@@ -442,7 +494,7 @@ $<HTMLInputElement>('file').addEventListener('change', async (e) => {
     await startFile(f);
     listening(true);
   } catch (err) {
-    onEngine({ type: 'error', message: `Could not play file: ${(err as Error).message}` });
+    showError('Could not play file: {0}', (err as Error).message);
   }
 });
 
@@ -484,15 +536,36 @@ $('search-form').addEventListener('submit', (e) => {
 
 const P = window.presentation;
 
+/** After a language change: every word on screen again, in the new language. */
+function refreshWords(): void {
+  applyWords();
+  $('mic').textContent = t($('mic').classList.contains('live') ? 'Stop listening' : 'Start listening');
+  $('status-text').textContent = t(...statusWords);
+  $('error').textContent = t(...errorWords);
+  renderBanis();
+  renderStats();
+  renderShabad();
+  for (const [el, [items, empty]] of lists) renderCandidates(el, items, empty);
+  if (status) renderStatus(status);
+  if (lastUpdates) renderUpdates(lastUpdates);
+  if (view) $('blank-label').textContent = t(view.blank ? 'Show again' : 'Blank');
+  void listDevices();
+}
+
 function renderView(v: DisplayView): void {
   view = v;
   const blank = $('blank');
   blank.classList.toggle('on', v.blank);
-  blank.lastChild!.textContent = v.blank ? ' Show again' : ' Blank';
+  $('blank-label').textContent = t(v.blank ? 'Show again' : 'Blank');
   $('blank-badge').hidden = !v.blank;
   const st = v.settings;
   $<HTMLInputElement>('font-scale').value = String(st.fontScale);
   radio('theme', st.theme);
+  radio('language', st.language);
+  if (st.language !== lang) {
+    lang = st.language;
+    refreshWords();
+  }
   radio('hindi', st.hindi);
   for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="meaning"]'))) {
     el.checked = st.meaning.includes(el.value as MeaningLang);
@@ -513,34 +586,34 @@ function renderStatus(s: PresentStatus): void {
   sel.textContent = '';
   const auto = document.createElement('option');
   auto.value = '';
-  auto.textContent = 'Second screen (automatic)';
+  auto.textContent = t('Second screen (automatic)');
   sel.append(auto);
   for (const d of s.projector.displays) {
     const o = document.createElement('option');
     o.value = String(d.id);
-    o.textContent = `${d.label}, ${d.width} × ${d.height}${d.primary ? ' (this screen)' : ''}`;
+    o.textContent = `${d.label}, ${d.width} × ${d.height}${d.primary ? t(' (this screen)') : ''}`;
     sel.append(o);
   }
   sel.value = s.projector.displayId === null ? '' : String(s.projector.displayId);
   const p = s.projector;
-  $('proj-toggle').textContent = p.enabled ? 'Hide' : 'Show';
+  $('proj-toggle').textContent = t(p.enabled ? 'Hide' : 'Show');
   $('proj-toggle').classList.toggle('primary', !p.enabled);
-  $('proj-toggle').title = p.enabled ? 'Close the projector window' : 'Open the projector window on the chosen screen';
+  $('proj-toggle').title = t(p.enabled ? 'Close the projector window' : 'Open the projector window on the chosen screen');
   const target = p.displays.find((d) => d.id === p.targetId);
   $('proj-status').textContent = p.enabled
     ? p.showing && target
-      ? `Showing on ${target.label}${target.primary ? '. Press Esc on the projector to close it.' : '.'}`
-      : 'Waiting for the chosen screen to be connected.'
+      ? t(target.primary ? 'Showing on {0}. Press Esc on the projector to close it.' : 'Showing on {0}.', target.label)
+      : t('Waiting for the chosen screen to be connected.')
     : p.displays.length > 1
-      ? 'Off. Press Show to put Gurbani on the projector.'
-      : 'Only one screen is connected. Connect the projector, or show it here (Esc closes it).';
+      ? t('Off. Press Show to put Gurbani on the projector.')
+      : t('Only one screen is connected. Connect the projector, or show it here (Esc closes it).');
   $('url-overlay').textContent = s.server.urls.overlay;
   $<HTMLInputElement>('opt-lan').checked = s.server.lan;
   const lan = $('lan-urls');
   lan.textContent = '';
   if (s.server.lan) {
     if (!s.server.urls.lanFollow.length) {
-      lan.textContent = 'No Wi-Fi or network connection found on this computer.';
+      lan.textContent = t('No Wi-Fi or network connection found on this computer.');
     }
     for (const url of s.server.urls.lanFollow) {
       const row = document.createElement('div');
@@ -548,14 +621,14 @@ function renderStatus(s: PresentStatus): void {
       const code = document.createElement('code');
       code.textContent = url;
       const b = document.createElement('button');
-      b.textContent = 'Copy';
+      b.textContent = t('Copy');
       b.addEventListener('click', () => void P.copy(url));
       row.append(code, b);
       lan.append(row);
     }
     const note = document.createElement('p');
     note.className = 'hint';
-    note.textContent = 'Open this address in the phone browser. The phone must be on the same Wi-Fi as this computer.';
+    note.textContent = t('Open this address in the phone browser. The phone must be on the same Wi-Fi as this computer.');
     lan.append(note);
   }
 }
@@ -585,6 +658,7 @@ $('proj-display').addEventListener('change', (e) => {
 });
 $('font-scale').addEventListener('input', (e) => setting({ fontScale: Number((e.target as HTMLInputElement).value) }));
 onRadio('theme', (v) => setting({ theme: v as PresentationSettings['theme'] }));
+onRadio('language', (v) => setting({ language: v as UiLanguage }));
 onRadio('hindi', (v) => setting({ hindi: v as PresentationSettings['hindi'] }));
 for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="meaning"]'))) {
   el.addEventListener('change', () => {
@@ -620,33 +694,35 @@ window.addEventListener('keydown', (e) => {
 const U = window.updates;
 /** A version the operator dismissed with Later (shown again after Check now). */
 let laterFor: string | null = null;
+let lastUpdates: UpdateStatus | null = null;
 
 function renderUpdates(s: UpdateStatus): void {
   const v = s.release?.version ?? '';
-  $('app-version').textContent = `Kirtan Saathi ${s.current}`;
+  lastUpdates = s;
+  $('app-version').textContent = t('Kirtan Saathi {0}', lang === 'pa' ? gurmukhiDigits(s.current) : s.current);
   $<HTMLInputElement>('opt-update-check').checked = s.prefs.check;
   const auto = $<HTMLInputElement>('opt-update-auto');
   auto.checked = s.prefs.auto && s.canInstall;
   auto.disabled = !s.canInstall;
   $('update-auto-hint').textContent = s.canInstall
-    ? 'Updates download in the background and install when you close Kirtan Saathi, never during kirtan.'
-    : 'This copy of Kirtan Saathi cannot install updates itself. When there is a new version, Download opens the release page.';
+    ? t('Updates download in the background and install when you close Kirtan Saathi, never during kirtan.')
+    : t('This copy of Kirtan Saathi cannot install updates itself. When there is a new version, Download opens the release page.');
   const pct = Math.round(s.progress * 100);
   $('update-state').textContent = {
     idle: '',
-    checking: 'Checking for updates…',
-    latest: 'You have the latest version.',
-    offline: 'Not connected to the internet. Kirtan Saathi checks again when it is.',
-    available: `Version ${v} is available.`,
-    downloading: `Downloading version ${v}: ${pct}%`,
-    ready: `Version ${v} is downloaded. It installs when you close Kirtan Saathi.`,
-    error: `Could not check for updates: ${s.message}`,
+    checking: t('Checking for updates…'),
+    latest: t('You have the latest version.'),
+    offline: t('Not connected to the internet. Kirtan Saathi checks again when it is.'),
+    available: t('Version {0} is available.', v),
+    downloading: t('Downloading version {0}: {1}%', v, pct),
+    ready: t('Version {0} is downloaded. It installs when you close Kirtan Saathi.', v),
+    error: t('Could not check for updates: {0}', s.message),
   }[s.state];
 
   const show = !!s.release && ['available', 'downloading', 'ready'].includes(s.state) && laterFor !== v;
   $('update').hidden = !show;
   if (!show) return;
-  $('update-title').textContent = s.state === 'ready' ? `Kirtan Saathi ${v} is ready to install` : `Kirtan Saathi ${v} is available`;
+  $('update-title').textContent = t(s.state === 'ready' ? 'Kirtan Saathi {0} is ready to install' : 'Kirtan Saathi {0} is available', v);
   const list = $('update-notes');
   list.textContent = '';
   for (const n of s.release!.notes) {
@@ -660,7 +736,7 @@ function renderUpdates(s: UpdateStatus): void {
   const install = $<HTMLButtonElement>('update-install');
   install.hidden = !s.canInstall;
   install.disabled = s.state === 'downloading';
-  install.textContent = s.state === 'ready' ? 'Restart and update' : s.state === 'downloading' ? `Downloading ${pct}%` : 'Update now';
+  install.textContent = s.state === 'ready' ? t('Restart and update') : s.state === 'downloading' ? t('Downloading {0}%', pct) : t('Update now');
   $('update-download').hidden = s.canInstall && !s.message;
 }
 

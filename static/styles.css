@@ -178,6 +178,8 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0
   background: rgba(14, 22, 49, 0.88); color: var(--ink); font-weight: 600; font-size: 18px;
 }
 [hidden] { display: none !important; }
+/* Punjabi app: English words beside their Gurmukhi are dropped. */
+:root[data-lang='pa'] .en-only { display: none; }
 .steer { display: flex; flex-direction: column; gap: 8px; padding-bottom: 28px; }
 .steer button { display: flex; align-items: center; gap: 10px; justify-content: flex-start; padding: 11px 16px; min-width: 150px; font-weight: 550; }
 #next { justify-content: space-between; }
@@ -211,6 +213,7 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0
 .lines li.header { color: var(--faint); font-size: 15px; cursor: default; }
 .lines li.header:hover { background: transparent; }
 .lines li.rahao::after { content: 'rahao'; font: 500 11px var(--ui); color: var(--faint); margin-left: 10px; vertical-align: middle; }
+:root[data-lang='pa'] .lines li.rahao::after { content: 'ਰਹਾਉ'; }
 .v-main { color: var(--kesri); }
 .v-medium { color: #f3cf7a; }
 .v-short { color: #8fd8b0; }
