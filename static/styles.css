@@ -114,10 +114,21 @@ kbd {
   background: var(--surmai-2);
 }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; font-stretch: 88%; letter-spacing: 0.01em; }
-.mark { width: 30px; height: 30px; fill: var(--kesri); stroke: var(--kesri); stroke-width: 3; stroke-linecap: round; }
-.mark path { fill: none; }
-.mark .dim { fill: var(--muted); stroke: none; }
-.mark circle, .mark rect { stroke: none; }
+.mark { width: 30px; height: 30px; }
+.mark .wave line { stroke: var(--kesri); stroke-width: 3.2; stroke-linecap: round; transform-box: fill-box; transform-origin: center; }
+.mark .wave .dim { stroke: #ffc97a; }
+.mark .rumala { fill: var(--kesri-deep); }
+.mark .page { fill: #fbeccb; }
+.mark .text { fill: none; stroke: #c9b48a; stroke-width: 1.3; stroke-linecap: round; }
+.mark .text.lit { stroke: var(--kesri); }
+/* While listening, the waveform over the pothi moves. */
+.listening .mark .wave line { animation: hear 1.1s ease-in-out infinite; }
+.listening .mark .wave line:nth-child(1) { animation-delay: -0.5s; }
+.listening .mark .wave line:nth-child(2) { animation-delay: -0.2s; }
+.listening .mark .wave line:nth-child(4) { animation-delay: -0.7s; }
+.listening .mark .wave line:nth-child(5) { animation-delay: -0.35s; }
+@keyframes hear { 0%, 100% { transform: scaleY(0.45); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .listening .mark .wave line { animation: none; } }
 
 .modes { justify-self: center; display: flex; align-items: center; gap: 4px; padding: 4px; background: var(--surmai); border: 1px solid var(--line); border-radius: 999px; }
 .modes button {

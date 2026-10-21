@@ -27,12 +27,14 @@ export const VERSION = (JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf
 /**
  * The stand-in for GitHub; tests change it. `answer` and `status` are the
  * latest-release API reply; `feed` is the update the app may download
- * (electron-updater's latest.yml / latest-linux.yml and the file).
+ * (electron-updater's latest.yml / latest-linux.yml and the file); `asked`
+ * counts requests for the latest release.
  */
-export const releases: { answer: Record<string, unknown>; status: number; feed: { version: string; payload: Buffer } | null } = {
+export const releases: { answer: Record<string, unknown>; status: number; feed: { version: string; payload: Buffer } | null; asked: number } = {
   answer: { tag_name: `v${VERSION}` },
   status: 200,
   feed: null,
+  asked: 0,
 };
 let releasesBase: string | null = null;
 
@@ -47,6 +49,7 @@ async function releaseServer(): Promise<string> {
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     const f = releases.feed;
     if (path === '/releases/latest') {
+      releases.asked++;
       res.writeHead(releases.status, { 'Content-Type': 'application/json' }).end(JSON.stringify(releases.answer));
     } else if (f && (path === '/feed/latest.yml' || path === '/feed/latest-linux.yml')) {
       const file = feedFile(f.version);

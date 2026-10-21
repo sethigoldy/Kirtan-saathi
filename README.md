@@ -169,6 +169,7 @@ When the computer is online, Kirtan Saathi checks GitHub for a new release short
 |---|---|
 | Windows installer, Linux AppImage | **Update now** downloads the update. It installs when you close Kirtan Saathi, or straight away with **Restart and update**. With *App → Install updates automatically*, updates download in the background and install when you close the app, never during kirtan. |
 | macOS `.dmg`, Linux `.deb` | **Download** opens the release page. (macOS does not let unsigned apps replace themselves.) |
+| Microsoft Store | The Store updates the app. It never checks GitHub, and *App* shows no update settings. |
 
 The check sends nothing but a request for the latest release. Turn it off with *App → Check for updates when online*. Offline, nothing is checked; the app looks again when the connection returns.
 
@@ -302,6 +303,35 @@ To get a test build without tagging, use *Actions → Installers → Run workflo
 
 Build installers locally with `npm run dist`. Output goes to `release/`.
 
+### Microsoft Store
+
+The Store signs the apps it distributes, so people who install from the Store see no SmartScreen warning. The Windows job of the installers workflow builds the Store package (`.appx`) from the same app as the setup wizard. It then installs a test-signed copy and runs the smoke test and the end-to-end tests against it, with the update checks replaced by a check that the Store copy never asks GitHub.
+
+One-time setup:
+
+1. Register as an individual developer at <https://storedeveloper.microsoft.com>. It is free; Microsoft verifies a government ID and a selfie.
+2. In Partner Center, create an app and reserve the name *Kirtan Saathi*.
+3. Open the app's *Product management → Product identity* page. Add three repository variables (*Settings → Secrets and variables → Actions → Variables*):
+
+   | Variable | Product identity value |
+   |---|---|
+   | `STORE_IDENTITY_NAME` | `Package/Identity/Name` |
+   | `STORE_PUBLISHER` | `Package/Identity/Publisher` |
+   | `STORE_PUBLISHER_NAME` | `Package/Properties/PublisherDisplayName` |
+
+   Without them, the package gets a test identity: it is built and tested, but not kept.
+
+For each version:
+
+1. Get the package. Releases keep it once the variables exist. For a version released before that, use *Actions → Installers → Run workflow* on its tag, with *prerelease* unticked. The run's `microsoft-store-package` artifact holds `Kirtan-Saathi-<version>-Microsoft-Store.appx`.
+2. In Partner Center, start a submission (the first one, or *Update* on the last) and upload the `.appx` under *Packages*.
+3. The first submission also needs:
+   - **Privacy policy URL:** <https://github.com/sethigoldy/Kirtan-saathi/blob/main/PRIVACY.md>
+   - **Store listing:** a description and screenshots (`docs/screenshots/`).
+   - **Age rating questionnaire.**
+   - **Why the app needs `runFullTrust`:** *Kirtan Saathi is a desktop (Electron) app packaged with MSIX. It runs its speech recognition and its local presentation server as a desktop process.*
+4. Submit for certification. The Store then updates installed copies.
+
 Benchmark outputs:
 
 - **Where results appear:** in the job summary and as a sticky comment on the pull request.
@@ -327,7 +357,7 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | `src/main/` | Electron main, preload, engine utility process, message protocol, display state, presentation server, projector window, settings, meanings |
 | `src/present/`, `static/present/` | Projector / overlay / phone page, Gurmukhi formatting and Devanagari transliteration |
 | `src/renderer/`, `static/` | Operator window, audio capture worklet, styles |
-| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon, macOS entitlements |
+| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon (`build/icon.svg`; `node scripts/make-icons.mjs` renders the PNG, ICO, ICNS and Store tiles), macOS entitlements |
 | `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score`, `caption-label`, `caption-pack`, `caption-eval`, `darbar-batch` |
 | `src/test/` | Unit tests (`npm test`) |
 | `src/e2e/` | End-to-end tests of the running app (`npm run e2e`) |
@@ -357,7 +387,7 @@ The model download is pinned to a Hugging Face revision and checked against a SH
 - **No katha mode yet.** Katha speech may briefly lock onto a shabad.
 - **Gurmukhi-only text search.** The operator search takes Gurmukhi text; first-letter search is not implemented.
 - **No Hindi translation yet.** The *Hindi* meaning shows the Punjabi arth in Devanagari. Real Hindi translations exist in BaniDB, but BaniDB's data is not openly licensed. Bundling it needs permission from the Khalis Foundation; the display already supports it (`DisplayLine.hi`).
-- **Unsigned installers.** Users confirm once (*Run anyway* / *Open Anyway*) until signing secrets are added.
+- **Unsigned installers.** Users confirm once (*Run anyway* / *Open Anyway*) until signing secrets are added. On Windows, the Microsoft Store version avoids this (see *Microsoft Store*).
 - **Limited evaluation coverage.** Dasam Granth, Vaaran and Bhai Nand Lal are searchable but have no evaluation audio. The kirtan set is small.
 - **Intel Mac.** CI tests it on `macos-15-intel`. GitHub plans to retire Intel macOS runners in fall 2027.
 - **Deferred: constrained decoding after lock.** At most 2.7% of kirtan frames could benefit. Rescoring identification candidates against the model's raw probabilities is the more promising next step.

@@ -76,6 +76,19 @@ nsis:
   runAfterFinish: true
   deleteAppDataOnUninstall: false
   artifactName: Kirtan-Saathi-Setup-${version}.${ext}
+# Microsoft Store package. The release workflow builds it from the unpacked
+# Windows app (--prepackaged) and passes the package identity Partner Center
+# assigns (identityName, publisher, publisherDisplayName) from repository
+# variables; see README → Microsoft Store. The Store signs the package, so
+# people installing from the Store see no SmartScreen warning. Tile images
+# are in build/appx/.
+appx:
+  applicationId: KirtanSaathi
+  displayName: Kirtan Saathi
+  backgroundColor: "#11204e"
+  # microphone: listening; privateNetworkClientServer: the phone page on the Wi-Fi.
+  capabilities: [runFullTrust, microphone, privateNetworkClientServer]
+  artifactName: Kirtan-Saathi-${version}-Microsoft-Store.${ext}
 
 linux:
   icon: build/icon.png

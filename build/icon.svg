@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Kirtan Saathi app icon: an open pothi on a rumala, with the sound of
+       the recitation rising from it as a waveform. scripts/make-icons.mjs
+       renders it to icon.png, icon.ico, icon.icns and the Store tiles
+       (appx/); the operator window's logo is a small copy (static/index.html). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2f6e" />
+      <stop offset="1" stop-color="#0b1638" />
+    </linearGradient>
+    <linearGradient id="page-l" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff8e6" />
+      <stop offset="0.8" stop-color="#fbeccb" />
+      <stop offset="1" stop-color="#e9d2a0" />
+    </linearGradient>
+    <linearGradient id="page-r" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0" stop-color="#fff8e6" />
+      <stop offset="0.8" stop-color="#fbeccb" />
+      <stop offset="1" stop-color="#e9d2a0" />
+    </linearGradient>
+    <linearGradient id="rumala" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7a33a" />
+      <stop offset="1" stop-color="#d8761c" />
+    </linearGradient>
+  </defs>
+
+  <g id="background">
+    <rect x="57" y="57" width="910" height="910" rx="206" fill="url(#bg)" />
+  </g>
+
+  <g id="glyph" transform="translate(0 -46)">
+    <!-- The recitation, heard: a waveform rising from the pothi -->
+    <g stroke-linecap="round" stroke-width="50">
+      <line x1="340" y1="375" x2="340" y2="485" stroke="#ffc97a" />
+      <line x1="426" y1="335" x2="426" y2="525" stroke="#ffb24d" />
+      <line x1="512" y1="300" x2="512" y2="560" stroke="#ff9f2e" />
+      <line x1="598" y1="335" x2="598" y2="525" stroke="#ffb24d" />
+      <line x1="684" y1="375" x2="684" y2="485" stroke="#ffc97a" />
+    </g>
+
+    <!-- Rumala -->
+    <path d="M 196 742 Q 512 716 828 742 L 868 842 Q 512 872 156 842 Z" fill="url(#rumala)" />
+    <path d="M 172 822 Q 512 850 852 822" fill="none" stroke="#ffd98a" stroke-width="10" stroke-linecap="round" />
+
+    <!-- Page stacks -->
+    <path d="M 512 628 Q 380 596 236 616 L 236 790 Q 380 772 512 808 Z" fill="#e2c48c" />
+    <path d="M 512 628 Q 644 596 788 616 L 788 790 Q 644 772 512 808 Z" fill="#e2c48c" />
+
+    <!-- Open pages -->
+    <path d="M 512 610 Q 380 574 248 594 L 248 770 Q 380 752 512 790 Z" fill="url(#page-l)" />
+    <path d="M 512 610 Q 644 574 776 594 L 776 770 Q 644 752 512 790 Z" fill="url(#page-r)" />
+    <path d="M 512 610 L 512 790" stroke="#c9a462" stroke-width="6" />
+
+    <!-- Lines of Gurbani; the one being recited is lit -->
+    <g fill="none" stroke-linecap="round" stroke-width="16">
+      <path d="M 290 634 Q 390 620 476 640" stroke="#c9b48a" />
+      <path d="M 290 678 Q 390 664 476 684" stroke="#c9b48a" />
+      <path d="M 290 722 Q 390 708 450 722" stroke="#c9b48a" />
+      <path d="M 548 640 Q 634 620 734 634" stroke="#c9b48a" />
+      <path d="M 548 684 Q 634 664 734 678" stroke="#ff9f2e" stroke-width="18" />
+      <path d="M 574 722 Q 634 708 734 722" stroke="#c9b48a" />
+    </g>
+  </g>
+</svg>

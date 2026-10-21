@@ -28,6 +28,8 @@ export interface UpdateStatus {
   release: Release | null;
   /** This copy can install updates itself (Windows installer, Linux AppImage). */
   canInstall: boolean;
+  /** Installed from the Microsoft Store, which updates it: nothing is checked here. */
+  store: boolean;
   /** Download progress, 0–1. */
   progress: number;
   message: string;

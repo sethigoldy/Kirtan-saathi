@@ -8,7 +8,8 @@
  * background when "Install updates automatically" is on. A downloaded update
  * installs when the app closes (or on Restart and update), never during
  * kirtan. Unsigned macOS apps and .deb installs cannot replace themselves, so
- * they get a link to the release page instead.
+ * they get a link to the release page instead. Copies from the Microsoft
+ * Store are updated by the Store and never check here.
  *
  *   KIRTAN_SAATHI_UPDATE_URL    release JSON to check instead of GitHub (tests)
  *   KIRTAN_SAATHI_UPDATE_FEED   update feed to download from instead of GitHub
@@ -25,7 +26,7 @@ const EVERY_MS = 6 * 3600_000;
 
 /** Whether this copy of the app can replace itself. */
 function canSelfUpdate(): boolean {
-  if (!app.isPackaged) return false;
+  if (!app.isPackaged || process.windowsStore) return false;
   // Installed by the setup wizard, which leaves its uninstaller next to the app (not a copied folder).
   if (process.platform === 'win32') return existsSync(join(dirname(process.execPath), `Uninstall ${app.getName()}.exe`));
   if (process.platform === 'linux') return !!process.env.APPIMAGE;
@@ -39,7 +40,7 @@ export class Updates extends EventEmitter {
 
   constructor(private readonly prefs: () => UpdatePrefs) {
     super();
-    this.s = { current: app.getVersion(), state: 'idle', release: null, canInstall: canSelfUpdate(), progress: 0, message: '' };
+    this.s = { current: app.getVersion(), state: 'idle', release: null, canInstall: canSelfUpdate(), store: !!process.windowsStore, progress: 0, message: '' };
   }
 
   status(): UpdateStatus {
@@ -52,6 +53,7 @@ export class Updates extends EventEmitter {
   }
 
   start(delayMs = 5000): void {
+    if (this.s.store) return;
     setTimeout(() => void this.check(false), delayMs);
     this.timer = setInterval(() => void this.check(false), EVERY_MS);
   }
@@ -63,7 +65,7 @@ export class Updates extends EventEmitter {
 
   /** Look for a newer release. Automatic checks stay quiet when they fail. */
   async check(manual: boolean): Promise<void> {
-    if (!manual && !this.prefs().check) return;
+    if (this.s.store || (!manual && !this.prefs().check)) return;
     if (this.s.state === 'checking' || this.s.state === 'downloading' || this.s.state === 'ready') return;
     if (!net.isOnline()) {
       this.set({ state: 'offline', message: '' });
