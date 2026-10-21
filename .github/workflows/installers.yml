@@ -3,7 +3,8 @@ name: Installers
 # Builds the installers people download: a Windows setup wizard, macOS disk
 # images for Apple Silicon and Intel, and Linux packages. Each installer is
 # installed on a clean CI machine of its own OS and the installed app is run
-# against a recorded Japji Sahib paath before anything is published.
+# against a recorded Japji Sahib paath before anything is published. The
+# installed Windows app also passes the end-to-end tests (src/e2e/).
 #
 #   Merge to main with a new "version" in package.json -> GitHub Release vX.Y.Z
 #                                     (the tag is created by this workflow; versions
@@ -199,6 +200,16 @@ jobs:
           if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'app did not finish within 3 minutes' }
           Get-Content smoke\app.log -ErrorAction SilentlyContinue | Select-Object -Last 20
           node scripts/check-smoke.mjs smoke/report.json smoke/operator.png smoke/projector.png
+
+      - name: End-to-end tests (installed Windows app)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          E2E_OUT: smoke/e2e
+        run: |
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Kirtan Saathi.exe' | Select-Object -First 1
+          $env:KIRTAN_APP = $exe.FullName
+          npm run e2e
 
       - name: Install and run (macOS)
         if: runner.os == 'macOS'

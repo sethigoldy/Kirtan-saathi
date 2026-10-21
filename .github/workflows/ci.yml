@@ -92,3 +92,53 @@ jobs:
           python3 scripts/make-caption-video.py test/fixtures/japji-50s.timeline.json test/fixtures/japji-50s.wav "$RUNNER_TEMP/cap/japji.mp4" --style translucent --font anek --seconds 50
           node dist/cli/caption-label.js "$RUNNER_TEMP/cap/japji.mp4" --out "$RUNNER_TEMP/cap/out"
           node dist/cli/caption-eval.js "$RUNNER_TEMP/cap/out/japji/japji.json" "$RUNNER_TEMP/cap/japji.truth.json" --min-recall 0.9
+
+  # Every operator feature, checked in the packaged Windows app (what the
+  # installer installs): listening through a fake microphone that plays the
+  # Japji fixture, steering, Find, looks, projector, phones, OBS, restart.
+  app:
+    name: Windows app (end-to-end)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      npm_config_onnxruntime_node_install: skip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Cache acoustic model
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: model-karansea-int8-v1
+
+      - name: Fetch acoustic model
+        run: npm run fetch-assets -- --model-only
+
+      - name: Package the Windows app (no installer)
+        run: npx electron-builder --win --x64 --dir --publish never
+
+      - name: End-to-end tests
+        shell: pwsh
+        env:
+          E2E_OUT: e2e-results
+        run: |
+          $env:KIRTAN_APP = (Resolve-Path 'release\win-unpacked\Kirtan Saathi.exe').Path
+          npm run e2e
+
+      - name: Upload screenshots and app logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-windows
+          path: e2e-results/
+          if-no-files-found: ignore
