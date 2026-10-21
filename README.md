@@ -240,7 +240,7 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 
 ### Darbar Sahib recordings (private)
 
-Darbar Sahib kirtan broadcasts show the Gurbani line on screen, and the caption labeller turns them into labelled test and training data. The recordings are used with SGPC's permission and stay in the private `kirtan-saathi-data` repository. The benchmark adds them as a private set when the `DATA_REPO_TOKEN` secret is present, and reports only aggregate numbers. See [docs/darbar-sahib-data.md](docs/darbar-sahib-data.md).
+Darbar Sahib kirtan broadcasts show the Gurbani line on screen, and the caption labeller turns them into labelled test and training data. The recordings are used with SGPC's permission and stay in the private `kirtan-saathi-data` repository. The benchmark adds them as a private set when the `DATA_REPO_TOKEN` secret is present, and reports only aggregate numbers. `npm run darbar-batch -- --count 100 --workers 3 --push` builds the dataset from SGPC's stream archive, using parallel workers and optionally several computers (`--shard`). See [docs/darbar-sahib-data.md](docs/darbar-sahib-data.md).
 
 ### Releasing a version
 
@@ -286,7 +286,7 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | `src/present/`, `static/present/` | Projector / overlay / phone page, Gurmukhi formatting and Devanagari transliteration |
 | `src/renderer/`, `static/` | Operator window, audio capture worklet, styles |
 | `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon, macOS entitlements |
-| `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score`, `caption-label`, `caption-pack`, `caption-eval` |
+| `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score`, `caption-label`, `caption-pack`, `caption-eval`, `darbar-batch` |
 | `src/test/` | Unit tests (`npm test`) |
 | `scripts/` | Asset and evaluation-data fetchers |
 | `ci/` | Benchmark thresholds and baseline |

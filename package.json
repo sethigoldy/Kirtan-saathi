@@ -21,7 +21,8 @@
     "ci-bench": "node dist/cli/ci-bench.js",
     "soak": "node dist/cli/soak.js",
     "dist": "npm run build && electron-builder --publish never",
-    "icon": "python3 scripts/make-icon.py"
+    "icon": "python3 scripts/make-icon.py",
+    "darbar-batch": "node dist/cli/darbar-batch.js"
   },
   "dependencies": {
     "onnxruntime-node": "1.23.2"

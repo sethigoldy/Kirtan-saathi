@@ -36,6 +36,48 @@ The one miss is the three-letter heading "॥ ਜਪੁ ॥", which the OCR misr
 
 Real broadcasts will differ: font, band position, compression. Check the first few labelled recordings in `review.html`, and adjust `--region` if the captions are not in the bottom third.
 
+## Building the dataset in bulk
+
+`darbar-batch` builds the dataset from SGPC's archive of live kirtan streams (*Official SGPC LIVE | Gurbani Kirtan*, about three a day). It skips audio-only streams, Katha and Hukamnama.
+
+Run it on your own computer. YouTube refuses downloads from cloud servers, including GitHub's runners, with "Sign in to confirm you're not a bot". Home connections are normally fine.
+
+**Install** (once):
+
+| | |
+|---|---|
+| macOS | `brew install node ffmpeg tesseract yt-dlp` |
+| Windows | `winget install OpenJS.NodeJS.LTS Gyan.FFmpeg UB-Mannheim.TesseractOCR yt-dlp.yt-dlp` |
+| Ubuntu | `sudo apt install ffmpeg tesseract-ocr` and `pipx install yt-dlp` (Node 22 from nodejs.org) |
+
+Then, in a clone of this repository with the private data repository cloned next to it:
+
+```bash
+npm install && npm run build
+git clone https://github.com/sethigoldy/kirtan-saathi-data ../kirtan-saathi-data
+npm run darbar-batch -- --count 100 --workers 3 --push
+```
+
+What it does:
+
+1. **Lists the archive.** Finished, rejected and other computers' streams are skipped, so it can be stopped and restarted.
+2. **Finds the caption area** on 3 minutes of the first stream. It tries the bottom third, bottom quarter, bottom half, lower middle and top, and keeps the area that reads Gurbani. The result is saved to the data repository's `caption-region.json`, and every later run and computer reuses it. If no area reads Gurbani, the tool stops before any bulk download.
+3. **Runs parallel workers** (`--workers`, default 3). Each worker:
+   - downloads only the part it needs at 720p: 60 minutes from the middle 80% of a training stream, or 8 minutes from a test stream;
+   - labels the captions;
+   - packs the Opus audio, labels and metadata into the data repository;
+   - deletes the video.
+4. **Rejects** streams where captions cover under 25% of the window. They are recorded in `rejected/`.
+5. **Commits and pushes** every 5 recordings with `--push`, rebasing first so several computers can push to the same repository.
+
+**Several computers.** Run the same command on each with `--shard 1/3`, `--shard 2/3` and `--shard 3/3`. Each stream belongs to exactly one shard, decided from its id, so no two computers download the same stream.
+
+**Splits.** About one stream in 14 goes to `test/`, decided from the video id the same way on every computer. With 100 streams that gives about 7 test clips of 8 minutes each (about an hour). Training audio is about 1 GB per 100 streams. The benchmark downloads only `test/`.
+
+**Speed.** Labelling runs at several times real time per worker, and downloads usually dominate. Expect a few hours for 100 streams on a recent laptop. `--dry-run` lists what would be processed without downloading.
+
+If YouTube asks you to sign in from your own computer too, add `--cookies-from-browser chrome` (or `safari`, `firefox`). yt-dlp then uses that browser's YouTube session.
+
 ## Adding a recording
 
 Prerequisites on your computer:
