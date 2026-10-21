@@ -101,6 +101,7 @@ export const PA: Record<string, string> = {
   Updates: 'ਅੱਪਡੇਟ',
   'Check for updates when online': 'ਇੰਟਰਨੈੱਟ ਹੋਣ ’ਤੇ ਅੱਪਡੇਟ ਦੀ ਜਾਂਚ ਕਰੋ',
   'Install updates automatically': 'ਅੱਪਡੇਟ ਆਪਣੇ-ਆਪ ਇੰਸਟਾਲ ਕਰੋ',
+  'The Microsoft Store keeps Kirtan Saathi up to date.': 'ਮਾਈਕ੍ਰੋਸਾਫ਼ਟ ਸਟੋਰ ਕੀਰਤਨ ਸਾਥੀ ਨੂੰ ਆਪਣੇ-ਆਪ ਨਵਾਂ ਰੱਖਦਾ ਹੈ।',
   'Updates download in the background and install when you close Kirtan Saathi, never during kirtan.':
     'ਅੱਪਡੇਟ ਪਿਛੋਕੜ ਵਿੱਚ ਡਾਊਨਲੋਡ ਹੁੰਦੇ ਹਨ ਅਤੇ ਕੀਰਤਨ ਸਾਥੀ ਬੰਦ ਕਰਨ ’ਤੇ ਇੰਸਟਾਲ ਹੁੰਦੇ ਹਨ, ਕੀਰਤਨ ਦੌਰਾਨ ਕਦੇ ਨਹੀਂ।',
   'This copy of Kirtan Saathi cannot install updates itself. When there is a new version, Download opens the release page.':

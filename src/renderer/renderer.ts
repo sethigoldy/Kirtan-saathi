@@ -327,6 +327,7 @@ async function listDevices(): Promise<void> {
 function listening(on: boolean): void {
   const b = $('mic');
   b.classList.toggle('live', on);
+  document.body.classList.toggle('listening', on);
   b.textContent = t(on ? 'Stop listening' : 'Start listening');
   if (on && !shabad) setStatus('listening', 'Listening for the shabad…');
   if (!on) setStatus('idle', 'Not listening');
@@ -704,9 +705,14 @@ function renderUpdates(s: UpdateStatus): void {
   const auto = $<HTMLInputElement>('opt-update-auto');
   auto.checked = s.prefs.auto && s.canInstall;
   auto.disabled = !s.canInstall;
-  $('update-auto-hint').textContent = s.canInstall
-    ? t('Updates download in the background and install when you close Kirtan Saathi, never during kirtan.')
-    : t('This copy of Kirtan Saathi cannot install updates itself. When there is a new version, Download opens the release page.');
+  // Store copies: the Microsoft Store updates them, so there is nothing to set here.
+  $('update-switches').hidden = s.store;
+  $('update-check-row').hidden = s.store;
+  $('update-auto-hint').textContent = s.store
+    ? t('The Microsoft Store keeps Kirtan Saathi up to date.')
+    : s.canInstall
+      ? t('Updates download in the background and install when you close Kirtan Saathi, never during kirtan.')
+      : t('This copy of Kirtan Saathi cannot install updates itself. When there is a new version, Download opens the release page.');
   const pct = Math.round(s.progress * 100);
   $('update-state').textContent = {
     idle: '',
