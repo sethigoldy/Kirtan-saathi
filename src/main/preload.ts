@@ -30,3 +30,14 @@ contextBridge.exposeInMainWorld('presentation', {
   onView: (fn: (v: unknown) => void) => ipcRenderer.on('present:view', (_e, v) => fn(v)),
   onStatus: (fn: (s: unknown) => void) => ipcRenderer.on('present:status', (_e, s) => fn(s)),
 });
+
+// New releases: check, download, install, or open the release page.
+contextBridge.exposeInMainWorld('updates', {
+  status: () => ipcRenderer.invoke('updates:status'),
+  check: (manual: boolean) => ipcRenderer.invoke('updates:check', manual),
+  download: () => ipcRenderer.invoke('updates:download'),
+  install: () => ipcRenderer.invoke('updates:install'),
+  open: () => ipcRenderer.invoke('updates:open'),
+  setPrefs: (patch: unknown) => ipcRenderer.invoke('updates:prefs', patch),
+  onStatus: (fn: (s: unknown) => void) => ipcRenderer.on('updates:status', (_e, s) => fn(s)),
+});

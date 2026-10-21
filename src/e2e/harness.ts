@@ -9,7 +9,10 @@
  *   E2E_OUT=<dir>                            screenshots of failed checks and app logs (default e2e-results)
  */
 import { spawn } from 'node:child_process';
-import { createWriteStream, mkdirSync, mkdtempSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createWriteStream, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright-core';
@@ -18,6 +21,50 @@ import type { DisplayView } from '../main/display-types';
 export const REPO = resolve(__dirname, '..', '..');
 export const JAPJI_WAV = join(REPO, 'test', 'fixtures', 'japji-50s.wav');
 export const OUT = resolve(process.env.E2E_OUT ?? join(REPO, 'e2e-results'));
+/** The version under test (an installed app is built from this checkout). */
+export const VERSION = (JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as { version: string }).version;
+
+/**
+ * The stand-in for GitHub; tests change it. `answer` and `status` are the
+ * latest-release API reply; `feed` is the update the app may download
+ * (electron-updater's latest.yml / latest-linux.yml and the file).
+ */
+export const releases: { answer: Record<string, unknown>; status: number; feed: { version: string; payload: Buffer } | null } = {
+  answer: { tag_name: `v${VERSION}` },
+  status: 200,
+  feed: null,
+};
+let releasesBase: string | null = null;
+
+function feedFile(version: string): string {
+  return process.platform === 'win32' ? `Kirtan-Saathi-Setup-${version}.exe` : `Kirtan-Saathi-${version}-Linux-x86_64.AppImage`;
+}
+
+/** Update checks and downloads go to this local server, so tests never reach the internet. */
+async function releaseServer(): Promise<string> {
+  if (releasesBase) return releasesBase;
+  const s = createServer((req, res) => {
+    const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+    const f = releases.feed;
+    if (path === '/releases/latest') {
+      res.writeHead(releases.status, { 'Content-Type': 'application/json' }).end(JSON.stringify(releases.answer));
+    } else if (f && (path === '/feed/latest.yml' || path === '/feed/latest-linux.yml')) {
+      const file = feedFile(f.version);
+      const sha = createHash('sha512').update(f.payload).digest('base64');
+      res.writeHead(200, { 'Content-Type': 'text/yaml' }).end(
+        `version: ${f.version}\nfiles:\n  - url: ${file}\n    sha512: ${sha}\n    size: ${f.payload.length}\npath: ${file}\nsha512: ${sha}\nreleaseDate: '2026-01-01T00:00:00.000Z'\n`,
+      );
+    } else if (f && path === `/feed/${feedFile(f.version)}`) {
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': f.payload.length }).end(f.payload);
+    } else {
+      res.writeHead(404).end();
+    }
+  });
+  await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
+  s.unref();
+  releasesBase = `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+  return releasesBase;
+}
 
 export interface App {
   app: ElectronApplication;
@@ -55,7 +102,9 @@ let launches = 0;
 export async function launch(userData = mkdtempSync(join(tmpdir(), 'kirtan-saathi-e2e-'))): Promise<App> {
   mkdirSync(OUT, { recursive: true });
   const { exe, pre } = target();
-  const app = await electron.launch({ executablePath: exe, args: [...pre, ...switches(userData)], cwd: REPO, timeout: 120_000 });
+  const stand = await releaseServer();
+  const env = { ...process.env, KIRTAN_SAATHI_UPDATE_URL: `${stand}/releases/latest`, KIRTAN_SAATHI_UPDATE_FEED: `${stand}/feed` } as Record<string, string>;
+  const app = await electron.launch({ executablePath: exe, args: [...pre, ...switches(userData)], cwd: REPO, env, timeout: 120_000 });
   const log = createWriteStream(join(OUT, `app-${++launches}.log`));
   app.process().stdout?.pipe(log);
   app.process().stderr?.pipe(log);

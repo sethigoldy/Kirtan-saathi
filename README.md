@@ -63,6 +63,8 @@ Get the installer for your computer from the [Releases page](https://github.com/
 - **macOS:** `.dmg`, one for Apple Silicon and one for Intel.
 - **Linux:** `.deb`.
 
+Once installed, Kirtan Saathi tells you when a new version is out (see *Updates*).
+
 ## Results
 
 ### Kirtan: Live Gurbani Captioning benchmark v1 (live, blind)
@@ -149,6 +151,17 @@ npm run run-file -- path/to/nitnem.mp3 --mode bani:JAPJ
 - **Next line.** In paath and bani modes the next line is previewed under the current one.
 - **Find a shabad** (the *Find* tab) searches typed Gurmukhi text.
 
+### Updates
+
+When the computer is online, Kirtan Saathi checks GitHub for a new release shortly after it starts and every 6 hours. A notice at the bottom of the window shows the new version and what changed (from `CHANGELOG.md`).
+
+| Installed from | What happens |
+|---|---|
+| Windows installer, Linux AppImage | **Update now** downloads the update. It installs when you close Kirtan Saathi, or straight away with **Restart and update**. With *App → Install updates automatically*, updates download in the background and install when you close the app, never during kirtan. |
+| macOS `.dmg`, Linux `.deb` | **Download** opens the release page. (macOS does not let unsigned apps replace themselves.) |
+
+The check sends nothing but a request for the latest release. Turn it off with *App → Check for updates when online*. Offline, nothing is checked; the app looks again when the connection returns.
+
 ### Outputs
 
 All outputs render the same display state, so they always show the same line. A local server serves them on `http://127.0.0.1:7531` (the next free port if 7531 is taken).
@@ -233,7 +246,7 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 
 ### App tests (end-to-end)
 
-`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, recordings, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
+`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, recordings, update notices and self-update downloads, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
 
 ```bash
 npm run e2e                                              # this checkout
@@ -245,7 +258,7 @@ In PowerShell, against an installed or packaged app:
 $env:KIRTAN_APP = "<folder>\Kirtan Saathi.exe"; npm run e2e
 ```
 
-Each run uses a temporary settings folder. Screenshots of failed checks and the app's log go to `e2e-results/` (`E2E_OUT`). Checks marked *todo* describe known bugs: they run and report, but do not fail the run.
+Update checks and downloads go to a local stand-in for GitHub (`KIRTAN_SAATHI_UPDATE_URL`, `KIRTAN_SAATHI_UPDATE_FEED`), so the tests never reach the internet and never install anything. Each run uses a temporary settings folder. Screenshots of failed checks and the app's log go to `e2e-results/` (`E2E_OUT`). Checks marked *todo* describe known bugs: they run and report, but do not fail the run.
 
 ### GitHub Actions
 
@@ -262,7 +275,8 @@ Darbar Sahib kirtan broadcasts show the Gurbani line on screen, and the caption 
 ### Releasing a version
 
 1. Set `"version"` in `package.json` in your pull request. Use semantic versioning: `0.1.1` for fixes, `0.2.0` for features.
-2. Merge it to `main`. The *Installers* workflow sees that `v0.2.0` has no release yet and builds all four installers. Once all of them pass their install test, it publishes the **v0.2.0** release and creates its tag.
+2. Add a `## 0.2.0` section to `CHANGELOG.md` listing what changed. It becomes *What's new* at the top of the release notes, and installed apps show it with the update notice. The workflow refuses to publish a version without it.
+3. Merge it to `main`. The *Installers* workflow sees that `v0.2.0` has no release yet and builds all four installers. Once all of them pass their install test, it publishes the **v0.2.0** release and creates its tag.
 
 Merges that don't change the version build nothing. Pushing a tag `vX.Y.Z` that matches `package.json` also publishes that version.
 

@@ -6,6 +6,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomInt } from 'node:crypto';
 import { DEFAULT_SETTINGS, type PresentationSettings } from './display-types';
+import type { UpdatePrefs } from './update-check';
 
 export interface AppSettings {
   presentation: PresentationSettings;
@@ -22,6 +23,7 @@ export interface AppSettings {
     /** Needed by other machines for /api/control. */
     pin: string;
   };
+  updates: UpdatePrefs;
 }
 
 export const DEFAULT_PORT = 7531;
@@ -31,6 +33,7 @@ export function defaultSettings(): AppSettings {
     presentation: { ...DEFAULT_SETTINGS },
     projector: { enabled: false, displayId: null },
     server: { port: DEFAULT_PORT, lan: false, pin: String(randomInt(0, 10000)).padStart(4, '0') },
+    updates: { check: true, auto: false },
   };
 }
 
@@ -41,6 +44,7 @@ export function parseSettings(raw: unknown): AppSettings {
   const p = r.presentation ?? {};
   const pr = r.projector ?? {};
   const sv = r.server ?? {};
+  const up = r.updates ?? {};
   return {
     presentation: { ...d.presentation, ...(p as Partial<PresentationSettings>) },
     projector: {
@@ -51,6 +55,10 @@ export function parseSettings(raw: unknown): AppSettings {
       port: Number.isInteger(sv.port) && (sv.port as number) >= 1024 && (sv.port as number) < 65536 ? (sv.port as number) : d.server.port,
       lan: typeof sv.lan === 'boolean' ? sv.lan : d.server.lan,
       pin: typeof sv.pin === 'string' && /^\d{4,8}$/.test(sv.pin) ? sv.pin : d.server.pin,
+    },
+    updates: {
+      check: typeof up.check === 'boolean' ? up.check : d.updates.check,
+      auto: typeof up.auto === 'boolean' ? up.auto : d.updates.auto,
     },
   };
 }
