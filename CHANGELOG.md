@@ -2,6 +2,10 @@
 
 What changed in each release. When a version is released, its section becomes the *What's new* part of the GitHub release, and the app shows the same list when it offers the update. The release workflow does not publish a version without a section here.
 
+## 0.4.1
+
+- **Start listening works on every Windows PC.** On a PC without the Microsoft Visual C++ Redistributable, Start listening stopped with "The specified module could not be found". Kirtan Saathi now brings the files it needs with it.
+
 ## 0.4.0
 
 - **New shabads are found by themselves.** When the ragis start a new shabad, Kirtan Saathi now moves to it without Search again, also on slower computers. If it cannot tell what is being sung, it shows ਵਾਹਿਗੁਰੂ instead of keeping the old shabad on screen.

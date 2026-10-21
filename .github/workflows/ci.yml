@@ -127,6 +127,9 @@ jobs:
       - name: Package the Windows app (no installer)
         run: npx electron-builder --win --x64 --dir --publish never
 
+      - name: Native modules need only Windows
+        run: node scripts/check-windows-dlls.mjs release/win-unpacked
+
       - name: End-to-end tests
         shell: pwsh
         env:
