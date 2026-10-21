@@ -26,6 +26,7 @@
     "e2e": "npm run build && node --test --test-concurrency=1 --test-reporter=spec \"dist/e2e/*.e2e.js\""
   },
   "dependencies": {
+    "electron-updater": "6.8.10",
     "onnxruntime-node": "1.23.2"
   },
   "devDependencies": {

@@ -8,10 +8,12 @@
  *   KIRTAN_APP="C:\...\Kirtan Saathi.exe" npm run e2e   an installed or packaged app
  */
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { rmSync } from 'node:fs';
 import { after, before, describe, it } from 'node:test';
 import type { Page } from 'playwright-core';
-import { JAPJI_WAV, launch, launchSecond, plain, sleep, snap, state, until, type App } from './harness';
+import type { UpdateStatus } from '../main/update-check';
+import { JAPJI_WAV, launch, launchSecond, plain, releases, sleep, snap, state, until, VERSION, type App } from './harness';
 
 const LONG = 240_000;
 const POTHI = 'ਪੋਥੀ ਪਰਮੇਸਰ ਕਾ ਥਾਨੁ ॥';
@@ -22,6 +24,13 @@ const now = () => state(k.base);
 const text = async (sel: string) => ((await page().textContent(sel)) ?? '').trim();
 const level = () => page().$eval('#level', (el) => parseFloat((el as HTMLElement).style.width) || 0);
 const preview = () => page().frameLocator('#preview');
+const updates = () => page().evaluate(() => (window as unknown as { updates: { status(): Promise<UpdateStatus> } }).updates.status());
+/** A newer release as GitHub's API returns it. */
+const NEWER = {
+  tag_name: 'v99.0.0',
+  html_url: 'https://github.com/sethigoldy/Kirtan-saathi/releases/tag/v99.0.0',
+  body: "## What's new in 99.0.0\n\n- **English meaning** under the tuk\n- Full Punjabi app\n\n## Download\n\n- an installer",
+};
 
 /** A check that saves screenshots of every window when it fails. */
 function check(name: string, fn: () => Promise<void>, opts: { timeout?: number; todo?: string } = {}): void {
@@ -504,6 +513,84 @@ describe('Kirtan Saathi app', () => {
     await until('the button to read Start listening', () => text('#mic'), (t) => t === 'Start listening');
   }, { timeout: LONG });
 
+  // ---------- Updates ----------
+
+  check('tells the operator about a new release and what changed', async () => {
+    await page().click('[data-tab="app"]');
+    assert.equal(await text('#app-version'), `Kirtan Saathi ${VERSION}`);
+    assert.equal(await page().isChecked('#opt-update-check'), true, 'checks for updates by default');
+    assert.equal(await page().isChecked('#opt-update-auto'), false, 'installs only when asked, by default');
+    // GitHub's latest release is this version: nothing to offer.
+    await page().click('#update-check');
+    await until('up to date', () => text('#update-state'), (t) => t === 'You have the latest version.');
+    assert.equal(await page().isHidden('#update'), true);
+    // A newer release, with its notes.
+    releases.answer = NEWER;
+    await page().click('#update-check');
+    await page().waitForSelector('#update:not([hidden])');
+    assert.equal(await text('#update-title'), 'Kirtan Saathi 99.0.0 is available');
+    assert.deepEqual(await page().$$eval('#update-notes li', (l) => l.map((x) => x.textContent)), ['English meaning under the tuk', 'Full Punjabi app']);
+    const st = await updates();
+    assert.equal(await page().isVisible('#update-install'), st.canInstall, 'Update now where the app can update itself');
+    assert.equal(await page().isVisible('#update-download'), !st.canInstall, 'otherwise a link to the download');
+    assert.equal(await page().isDisabled('#opt-update-auto'), !st.canInstall);
+    await page().click('#update-later');
+    await until('Later to hide the notice', () => page().isHidden('#update'), (h) => h);
+    assert.match(await text('#update-state'), /Version 99\.0\.0 is available/);
+  });
+
+  check('reports a failed check when asked, and stays quiet otherwise', async () => {
+    releases.status = 500;
+    // Automatic check (the connection coming back): no notice, no message.
+    await page().evaluate(() => window.dispatchEvent(new Event('online')));
+    await until('the automatic check to finish', async () => (await updates()).state, (s) => s === 'idle');
+    assert.equal(await text('#update-state'), '');
+    assert.equal(await page().isHidden('#update'), true);
+    // Check now: the operator sees why.
+    await page().click('#update-check');
+    await until('the error', () => text('#update-state'), (t) => t === 'Could not check for updates: GitHub answered HTTP 500');
+    assert.equal(await page().isHidden('#update'), true);
+    releases.status = 200;
+    await page().click('#update-check');
+    await page().waitForSelector('#update:not([hidden])', { timeout: 15_000 });
+    assert.equal(await text('#update-title'), 'Kirtan Saathi 99.0.0 is available', 'Check now shows a release dismissed with Later again');
+  });
+
+  check('downloads the update where the app can update itself', async () => {
+    const st = await updates();
+    // The installers workflow sets this for the installed Windows app, so self-update cannot quietly turn off.
+    if (process.env.E2E_EXPECT_SELF_UPDATE === '1') assert.equal(st.canInstall, true, 'the installed app can update itself');
+    if (!st.canInstall) {
+      // Development runs, .deb and macOS: the release page instead (opening a browser is not tested).
+      assert.equal(await page().isVisible('#update-download'), true);
+      assert.equal(await page().isVisible('#update-install'), false);
+      return;
+    }
+    releases.feed = { version: '99.0.0', payload: randomBytes(512 * 1024) };
+    assert.equal(await text('#update-install'), 'Update now');
+    await page().click('#update-install');
+    const done = await until('the download to finish or fail', updates, (s) => s.state === 'ready' || !!s.message, 60_000);
+    assert.equal(done.message, '', 'the download did not fail');
+    assert.equal(await text('#update-state'), 'Version 99.0.0 is downloaded. It installs when you close Kirtan Saathi.');
+    assert.equal(await text('#update-title'), 'Kirtan Saathi 99.0.0 is ready to install');
+    assert.equal(await text('#update-install'), 'Restart and update');
+    assert.equal(await page().isHidden('#update-download'), true);
+    // Test downloads are never installed (KIRTAN_SAATHI_UPDATE_FEED), so the restart below stays on this version.
+  }, { timeout: 120_000 });
+
+  check('keeps the update settings', async () => {
+    const st = await updates();
+    await page().click('label:has(#opt-update-check)');
+    await until('checks off', async () => (await updates()).prefs.check, (c) => !c);
+    if (st.canInstall) {
+      await page().click('label:has(#opt-update-auto)');
+      await until('automatic updates on', async () => (await updates()).prefs.auto, (a) => a);
+    }
+    releases.answer = { tag_name: `v${VERSION}` };
+    releases.feed = null;
+    await page().click('[data-tab="screen"]');
+  });
+
   // ---------- Restart ----------
 
   check('remembers settings after a restart', async () => {
@@ -517,6 +604,15 @@ describe('Kirtan Saathi app', () => {
     assert.equal(await page().inputValue('#font-scale'), '1.5');
     assert.equal(await page().isChecked('#opt-lan'), false);
     assert.equal(await text('#proj-toggle'), 'Show', 'the projector stays off');
+    const up = await updates();
+    assert.equal(up.prefs.check, false, 'update checks stay off');
+    assert.equal(up.prefs.auto, up.canInstall, 'automatic updates stay on where the app can update itself');
+    assert.equal(up.state, 'idle', 'no check while checks are off');
+    assert.equal(await page().isChecked('#opt-update-check'), false);
+    await page().click('[data-tab="app"]');
+    await page().click('label:has(#opt-update-check)');
+    await until('checks back on', async () => (await updates()).prefs.check, (c) => c);
+    await page().click('[data-tab="screen"]');
   }, { timeout: LONG });
 
   check('a second launch keeps the running app', async () => {

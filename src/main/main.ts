@@ -23,6 +23,8 @@ import { Meanings } from './meanings';
 import { Projector } from './projector';
 import { PresentationServer, type ControlAction } from './server';
 import { SettingsStore } from './settings';
+import type { UpdatePrefs } from './update-check';
+import { Updates } from './updates';
 import type { ToEngine } from './protocol';
 
 let win: BrowserWindow | null = null;
@@ -32,6 +34,7 @@ let settings: SettingsStore;
 let display: DisplayState;
 let server: PresentationServer;
 let projector: Projector;
+let updates: Updates;
 
 function appBase(): string {
   return app.isPackaged ? process.resourcesPath : app.getAppPath();
@@ -135,6 +138,22 @@ function registerIpc(): void {
   });
   ipcMain.handle('present:copy', (_e, text: string) => {
     if (typeof text === 'string' && text.length < 500) clipboard.writeText(text);
+  });
+  ipcMain.handle('updates:status', () => updates.status());
+  ipcMain.handle('updates:check', (_e, manual: boolean) => updates.check(!!manual));
+  ipcMain.handle('updates:download', () => updates.download());
+  ipcMain.handle('updates:install', () => updates.installNow());
+  ipcMain.handle('updates:open', () => void shell.openExternal(updates.page));
+  ipcMain.handle('updates:prefs', (_e, patch: Partial<UpdatePrefs>) => {
+    settings.update((s) => {
+      if (typeof patch?.check === 'boolean') s.updates.check = patch.check;
+      if (typeof patch?.auto === 'boolean') s.updates.auto = patch.auto;
+    });
+    const st = updates.status();
+    win?.webContents.send('updates:status', st);
+    if (st.prefs.auto && st.state === 'available') void updates.download();
+    if (st.prefs.check && st.state === 'idle') void updates.check(false);
+    return st;
   });
   ipcMain.handle('present:open', (_e, url: string) => {
     // Only our own pages: the overlay / follow preview in the default browser.
@@ -255,9 +274,12 @@ if (!app.requestSingleInstanceLock() && !process.env.GURBANI_SMOKE) {
       pushStatus();
     });
     display.on('change', (view) => win?.webContents.send('present:view', view));
+    updates = new Updates(() => settings.get().updates);
+    updates.on('status', (st) => win?.webContents.send('updates:status', st));
     registerIpc();
 
     createWindow();
+    if (!process.env.GURBANI_SMOKE) updates.start();
     if (s.projector.enabled && !process.env.GURBANI_SMOKE) projector.set(true, s.projector.displayId);
     if (process.env.GURBANI_SMOKE) win!.webContents.once('did-finish-load', () => setTimeout(smokeTest, 8000));
   });
@@ -265,6 +287,7 @@ if (!app.requestSingleInstanceLock() && !process.env.GURBANI_SMOKE) {
   app.on('window-all-closed', () => app.quit());
 
   app.on('before-quit', () => {
+    updates?.stop();
     engine?.kill();
     settings?.flush();
     projector?.dispose();
