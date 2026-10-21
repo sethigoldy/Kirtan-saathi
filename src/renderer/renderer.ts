@@ -44,7 +44,7 @@ const ROLE_MANGAL = 3;
 let port: MessagePort | null = null;
 let shabad: UiShabad | null = null;
 let currentLine: number | null = null;
-let capture: { stop: () => void } | null = null;
+let capture: { stop: () => void; mic: boolean } | null = null;
 let mode: 'kirtan' | 'paath' | 'bani' = 'kirtan';
 let streamName: string | null = null;
 let view: DisplayView | null = null;
@@ -291,12 +291,32 @@ async function startMic(): Promise<void> {
   mute.gain.value = 0;
   src.connect(node).connect(mute).connect(ctx.destination);
   await listDevices(); // labels become available after permission
-  capture = {
+  const self = {
+    mic: true,
     stop: () => {
       stream.getTracks().forEach((t) => t.stop());
       void ctx.close();
     },
   };
+  capture = self;
+  // An unplugged input ends its track: carry on with what the input list now selects.
+  stream.getAudioTracks()[0]?.addEventListener('ended', () => {
+    if (capture === self) void listDevices().then(restartMic);
+  });
+}
+
+/** Moves capture to the selected input. The engine keeps its place in the shabad. */
+async function restartMic(): Promise<void> {
+  if (!capture?.mic) return;
+  capture.stop();
+  capture = null;
+  try {
+    await startMic();
+    $('error').hidden = true;
+  } catch (err) {
+    stopCapture();
+    onEngine({ type: 'error', message: micHelp(err as Error) });
+  }
 }
 
 /** Play an audio file and stream it to the engine at real-time pace. */
@@ -332,7 +352,7 @@ async function startFile(file: File): Promise<void> {
     capture = null;
     listening(false);
   };
-  capture = { stop };
+  capture = { stop, mic: false };
 }
 
 /** Plain-language help for the common microphone failures. */
@@ -390,6 +410,10 @@ $('mic').addEventListener('click', async () => {
     onEngine({ type: 'error', message: micHelp(err as Error) });
   }
 });
+
+// Choosing another input while listening switches to it; plugged-in inputs appear in the list.
+$('device').addEventListener('change', () => void restartMic());
+navigator.mediaDevices.addEventListener('devicechange', () => void listDevices());
 
 $<HTMLInputElement>('file').addEventListener('change', async (e) => {
   const f = (e.target as HTMLInputElement).files?.[0];
