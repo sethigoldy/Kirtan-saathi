@@ -80,6 +80,7 @@
         <button role="tab" aria-selected="true" data-tab="screen">Screen</button>
         <button role="tab" aria-selected="false" data-tab="share">Share</button>
         <button role="tab" aria-selected="false" data-tab="find">Find</button>
+        <button role="tab" aria-selected="false" data-tab="app">App</button>
       </div>
 
       <div class="panel" data-panel="screen">
@@ -161,6 +162,20 @@
         </section>
       </div>
 
+      <div class="panel" data-panel="app" hidden>
+        <section class="group">
+          <h2>Updates</h2>
+          <p id="app-version" class="version"></p>
+          <div class="switches">
+            <label class="switch"><input type="checkbox" id="opt-update-check" /><span class="track"></span>Check for updates when online</label>
+            <label class="switch"><input type="checkbox" id="opt-update-auto" /><span class="track"></span>Install updates automatically</label>
+          </div>
+          <p id="update-auto-hint" class="hint">Updates download in the background and install when you close Kirtan Saathi, never during kirtan.</p>
+          <div class="field-row"><button id="update-check">Check now</button></div>
+          <p id="update-state" class="hint" role="status"></p>
+        </section>
+      </div>
+
       <details class="details">
         <summary>Technical details</summary>
         <dl id="stats" class="stats"></dl>
@@ -169,6 +184,18 @@
       </details>
     </aside>
   </main>
+  <section id="update" class="update" aria-labelledby="update-title" hidden>
+    <div class="update-text">
+      <strong id="update-title"></strong>
+      <ul id="update-notes"></ul>
+      <p id="update-msg" class="hint" hidden></p>
+    </div>
+    <div class="update-actions">
+      <button id="update-install" class="primary">Update now</button>
+      <button id="update-download">Download</button>
+      <button id="update-later" class="ghost">Later</button>
+    </div>
+  </section>
   <footer id="error" class="error" role="alert" hidden></footer>
   <script type="module" src="./renderer.js"></script>
 </body>

@@ -5,6 +5,7 @@
  */
 import type { FromEngine, ToEngine, UiCandidate, UiEvent, UiShabad } from '../main/protocol';
 import type { DisplayView, PresentationSettings } from '../main/display-types';
+import type { UpdatePrefs, UpdateStatus } from '../main/update-check';
 
 interface PresentStatus {
   projector: {
@@ -31,6 +32,15 @@ declare global {
       open(url: string): Promise<void>;
       onView(fn: (v: DisplayView) => void): void;
       onStatus(fn: (s: PresentStatus) => void): void;
+    };
+    updates: {
+      status(): Promise<UpdateStatus>;
+      check(manual: boolean): Promise<void>;
+      download(): Promise<void>;
+      install(): Promise<void>;
+      open(): Promise<void>;
+      setPrefs(patch: Partial<UpdatePrefs>): Promise<UpdateStatus>;
+      onStatus(fn: (s: UpdateStatus) => void): void;
     };
   }
 }
@@ -210,8 +220,10 @@ function onEngine(msg: FromEngine): void {
     case 'event': {
       const ev = msg.ev;
       // Locks report evidence rather than a probability, so cap at 100%.
-      if (ev.state === 'locked') setStatus('locked', `Following (${Math.round(Math.min(1, ev.confidence) * 100)}% sure)`);
-      else if (ev.state === 'searching') setStatus('searching', 'Listening for the shabad…');
+      // A decode still in flight after Stop listening must not bring the status back.
+      const live = $('mic').classList.contains('live');
+      if (live && ev.state === 'locked') setStatus('locked', `Following (${Math.round(Math.min(1, ev.confidence) * 100)}% sure)`);
+      else if (live && ev.state === 'searching') setStatus('searching', 'Listening for the shabad…');
       mode = ev.mode;
       streamName = ev.stream;
       currentLine = ev.line;
@@ -595,6 +607,76 @@ window.addEventListener('keydown', (e) => {
   else return;
   e.preventDefault();
 });
+
+// ---------- Updates ----------
+
+const U = window.updates;
+/** A version the operator dismissed with Later (shown again after Check now). */
+let laterFor: string | null = null;
+
+function renderUpdates(s: UpdateStatus): void {
+  const v = s.release?.version ?? '';
+  $('app-version').textContent = `Kirtan Saathi ${s.current}`;
+  $<HTMLInputElement>('opt-update-check').checked = s.prefs.check;
+  const auto = $<HTMLInputElement>('opt-update-auto');
+  auto.checked = s.prefs.auto && s.canInstall;
+  auto.disabled = !s.canInstall;
+  $('update-auto-hint').textContent = s.canInstall
+    ? 'Updates download in the background and install when you close Kirtan Saathi, never during kirtan.'
+    : 'This copy of Kirtan Saathi cannot install updates itself. When there is a new version, Download opens the release page.';
+  const pct = Math.round(s.progress * 100);
+  $('update-state').textContent = {
+    idle: '',
+    checking: 'Checking for updates…',
+    latest: 'You have the latest version.',
+    offline: 'Not connected to the internet. Kirtan Saathi checks again when it is.',
+    available: `Version ${v} is available.`,
+    downloading: `Downloading version ${v}: ${pct}%`,
+    ready: `Version ${v} is downloaded. It installs when you close Kirtan Saathi.`,
+    error: `Could not check for updates: ${s.message}`,
+  }[s.state];
+
+  const show = !!s.release && ['available', 'downloading', 'ready'].includes(s.state) && laterFor !== v;
+  $('update').hidden = !show;
+  if (!show) return;
+  $('update-title').textContent = s.state === 'ready' ? `Kirtan Saathi ${v} is ready to install` : `Kirtan Saathi ${v} is available`;
+  const list = $('update-notes');
+  list.textContent = '';
+  for (const n of s.release!.notes) {
+    const li = document.createElement('li');
+    li.textContent = n;
+    list.append(li);
+  }
+  const msg = $('update-msg');
+  msg.hidden = !s.message;
+  msg.textContent = s.message;
+  const install = $<HTMLButtonElement>('update-install');
+  install.hidden = !s.canInstall;
+  install.disabled = s.state === 'downloading';
+  install.textContent = s.state === 'ready' ? 'Restart and update' : s.state === 'downloading' ? `Downloading ${pct}%` : 'Update now';
+  $('update-download').hidden = s.canInstall && !s.message;
+}
+
+$('update-install').addEventListener('click', () => {
+  void (U.status().then((s) => (s.state === 'ready' ? U.install() : U.download())));
+});
+$('update-download').addEventListener('click', () => void U.open());
+$('update-later').addEventListener('click', () => {
+  void U.status().then((s) => {
+    laterFor = s.release?.version ?? null;
+    renderUpdates(s);
+  });
+});
+$('update-check').addEventListener('click', () => {
+  laterFor = null;
+  void U.check(true);
+});
+$('opt-update-check').addEventListener('change', (e) => void U.setPrefs({ check: (e.target as HTMLInputElement).checked }));
+$('opt-update-auto').addEventListener('change', (e) => void U.setPrefs({ auto: (e.target as HTMLInputElement).checked }));
+// Back online after being offline: look again.
+window.addEventListener('online', () => void U.check(false));
+U.onStatus(renderUpdates);
+void U.status().then(renderUpdates);
 
 P.onView(renderView);
 P.onStatus(renderStatus);

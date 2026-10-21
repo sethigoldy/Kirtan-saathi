@@ -88,6 +88,10 @@ jobs:
                 publish=true prerelease=true tag="v$version-test.$GITHUB_RUN_NUMBER"
               fi ;;
           esac
+          if [ "$publish" = true ] && [ "$prerelease" != true ] && ! grep -qx "## $version" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## $version' section. Add what changed: it becomes the release notes and the app's update notice."
+            exit 1
+          fi
           echo "build=$build publish=$publish prerelease=$prerelease tag=$tag"
           { echo "build=$build"; echo "publish=$publish"; echo "prerelease=$prerelease"; echo "tag=$tag"; } >> "$GITHUB_OUTPUT"
 
@@ -206,6 +210,8 @@ jobs:
         shell: pwsh
         env:
           E2E_OUT: smoke/e2e
+          # The installed app must be able to update itself (checked, not skipped).
+          E2E_EXPECT_SELF_UPDATE: '1'
         run: |
           $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Kirtan Saathi.exe' | Select-Object -First 1
           $env:KIRTAN_APP = $exe.FullName
@@ -262,11 +268,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.os }}
+          # latest*.yml and the blockmaps let installed apps update themselves.
           path: |
             release/*.exe
             release/*.dmg
             release/*.deb
             release/*.AppImage
+            release/latest.yml
+            release/latest-linux.yml
+            release/*.blockmap
           if-no-files-found: error
           compression-level: 0
 
@@ -306,6 +316,15 @@ jobs:
           else
             title="Kirtan Saathi $version"; flags=(--target "$GITHUB_SHA")
           fi
-          sed -e "s/{{VERSION}}/$version/g" -e "s/{{TAG}}/$tag/g" .github/release-notes.md > notes.md
+          # What's new (from CHANGELOG.md; the app shows the same list), then the install guide.
+          {
+            if grep -qx "## $version" CHANGELOG.md; then
+              echo "## What's new in $version"
+              echo
+              awk -v h="## $version" '$0 == h {p = 1; next} /^## / {p = 0} p' CHANGELOG.md
+              echo
+            fi
+            sed -e "s/{{VERSION}}/$version/g" -e "s/{{TAG}}/$tag/g" .github/release-notes.md
+          } > notes.md
           gh release create "$tag" dist-installers/* --title "$title" --notes-file notes.md "${flags[@]}"
           echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
