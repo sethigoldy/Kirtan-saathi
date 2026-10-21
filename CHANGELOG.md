@@ -7,6 +7,7 @@ What changed in each release. When a version is released, its section becomes th
 - **English meaning.** Show the English translation under the tuk, alone or with the Punjabi arth or its Hindi-script version (Screen → Meaning). Each source is credited on screen, e.g. Translation: Dr. Sant Singh Khalsa.
 - **Kirtan Saathi in Punjabi.** App → Language → ਪੰਜਾਬੀ puts the app's buttons and messages in Punjabi, along with the source line on every screen (ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ · ਰਾਗੁ ਸੋਰਠਿ · ਅੰਗ ੬੨੮) and the phone page. Gurbani and the meanings are unchanged.
 - **Meaning on phones.** A reader's own meaning choice on the phone page now shows even when the projector shows no meaning.
+- **New icon.** An open pothi with the sound of the recitation rising from it. In the app, the sound moves while Kirtan Saathi is listening.
 
 ## 0.2.0
 
