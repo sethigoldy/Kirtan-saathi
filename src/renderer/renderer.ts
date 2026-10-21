@@ -220,6 +220,11 @@ function onEngine(msg: FromEngine): void {
       renderStats(ev);
       break;
     }
+    case 'line':
+      streamName = msg.stream;
+      currentLine = msg.line;
+      highlight();
+      break;
     case 'searchResults':
       renderCandidates($<HTMLOListElement>('results'), msg.results, 'No match');
       break;

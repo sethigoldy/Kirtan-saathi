@@ -79,6 +79,16 @@ function reportDisplay(): void {
   parent.postMessage({ type: 'display', report });
 }
 
+/** After an operator action, show the operator what the screens show (events only come with audio). */
+function showOperator(): void {
+  const d = engine!.display();
+  if (d.shabad !== lastShabad) {
+    lastShabad = d.shabad;
+    send({ type: 'shabad', shabad: d.shabad === null ? null : shabadPayload(d.shabad) });
+  }
+  send({ type: 'line', line: d.line, stream: d.stream });
+}
+
 function candidate(shabad: number, line: number, score: number, evidence: number): UiCandidate {
   const c = corpus!;
   return {
@@ -184,6 +194,7 @@ function handle(msg: ToEngine | null): void {
       return;
     }
   }
+  if (msg.type === 'lock' || msg.type === 'setLine' || msg.type === 'step') showOperator();
   if (msg.type !== 'audio') reportDisplay();
 }
 

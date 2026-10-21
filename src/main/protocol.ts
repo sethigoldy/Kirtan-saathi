@@ -70,4 +70,6 @@ export type FromEngine =
   | { type: 'error'; message: string }
   | { type: 'event'; ev: UiEvent }
   | { type: 'shabad'; shabad: UiShabad | null }
+  /** The line on screen after an operator action (Find, a clicked line, Next / Previous), with or without audio. */
+  | { type: 'line'; line: number | null; stream: string | null }
   | { type: 'searchResults'; query: string; results: UiCandidate[] };
