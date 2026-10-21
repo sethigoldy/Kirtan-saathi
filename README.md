@@ -101,6 +101,21 @@ Built from [surindersinghssj/gurbani-sehajpath](https://huggingface.co/datasets/
 - **"Exact" is lower than "within 1 line" by design.** The display moves once a word or so of the new line is read, so the first ~0.7 s of each line still shows the previous one.
 - **Training overlap.** The acoustic model may have been trained on this dataset. The validation split is the least likely to overlap, so treat it as the headline.
 
+### Shabad changes
+
+The first 150 s of one benchmark recording, then 150 s of another, played through the engine. The benchmark gates every change at normal pace (1×) and at 3×, the pace the app slows to on a slower computer: the new shabad must be on screen within 50 s, and the old one gone within 60 s.
+
+| Change | New shabad on screen, 1× | 3× | Old shabad still on screen, 1× | 3× |
+|---|---|---|---|---|
+| IZOsmkdmmcg → kZhIA8P6xWI | 28 s | 45 s | 36 s | 45 s |
+| kZhIA8P6xWI → kchMJPK9Axs | 11 s | 27 s | 11 s | 27 s |
+| kchMJPK9Axs → IZOsmkdmmcg | 14 s | 27 s | 14 s | 27 s |
+| zOtIpxMT9hU → kZhIA8P6xWI | 28 s | 30 s | 0 s | 0 s |
+| kZhIA8P6xWI → zOtIpxMT9hU | never | never | 41 s | 47 s |
+
+- **zOtIpxMT9hU is rarely recognised at all** (its first correct lock from a cold start takes 163 s). Only the old shabad leaving the screen is gated there. The app then shows ਵਾਹਿਗੁਰੂ, as after *Search again*.
+- **Earlier versions** took 57, 39 and 51 s for those new shabads at 3×. The old shabad stayed through all 150 s of zOtIpxMT9hU at either pace, until the operator pressed *Search again*.
+
 ### Compute
 
 Measured on a 2-vCPU Xeon @ 2.1 GHz with 2 threads.
