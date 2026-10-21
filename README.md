@@ -101,6 +101,21 @@ Built from [surindersinghssj/gurbani-sehajpath](https://huggingface.co/datasets/
 - **"Exact" is lower than "within 1 line" by design.** The display moves once a word or so of the new line is read, so the first ~0.7 s of each line still shows the previous one.
 - **Training overlap.** The acoustic model may have been trained on this dataset. The validation split is the least likely to overlap, so treat it as the headline.
 
+### Shabad changes
+
+The first 150 s of one benchmark recording, then 150 s of another, played through the engine. The benchmark gates every change at normal pace (1×) and at 3×, the pace the app slows to on a slower computer: the new shabad must be on screen within 50 s, and the old one gone within 60 s.
+
+| Change | New shabad on screen, 1× | 3× | Old shabad still on screen, 1× | 3× |
+|---|---|---|---|---|
+| IZOsmkdmmcg → kZhIA8P6xWI | 28 s | 45 s | 36 s | 45 s |
+| kZhIA8P6xWI → kchMJPK9Axs | 11 s | 27 s | 11 s | 27 s |
+| kchMJPK9Axs → IZOsmkdmmcg | 14 s | 27 s | 14 s | 27 s |
+| zOtIpxMT9hU → kZhIA8P6xWI | 28 s | 30 s | 0 s | 0 s |
+| kZhIA8P6xWI → zOtIpxMT9hU | never | never | 41 s | 47 s |
+
+- **zOtIpxMT9hU is rarely recognised at all** (its first correct lock from a cold start takes 163 s). Only the old shabad leaving the screen is gated there. The app then shows ਵਾਹਿਗੁਰੂ, as after *Search again*.
+- **Earlier versions** took 57, 39 and 51 s for those new shabads at 3×. The old shabad stayed through all 150 s of zOtIpxMT9hU at either pace, until the operator pressed *Search again*.
+
 ### Compute
 
 Measured on a 2-vCPU Xeon @ 2.1 GHz with 2 threads.
@@ -258,7 +273,7 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 
 ### App tests (end-to-end)
 
-`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, the Punjabi app, recordings, update notices and self-update downloads, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
+`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, the Punjabi app, recordings, update notices and self-update downloads, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. A second set (`shabads.e2e.ts`) plays one shabad and then another (`test/fixtures/two-shabads.wav`) and checks that the new shabad comes on screen by itself, without *Search again*: once at the computer's own pace, and once held at 3× pace (`KIRTAN_SAATHI_MIN_PACE=3`) as on a slow computer. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
 
 ```bash
 npm run e2e                                              # this checkout
@@ -277,7 +292,7 @@ Update checks and downloads go to a local stand-in for GitHub (`KIRTAN_SAATHI_UP
 | Workflow | When | What |
 |---|---|---|
 | `.github/workflows/ci.yml` | every push and pull request | Build and unit tests, plus a native ONNX Runtime model smoke test on Ubuntu, Windows and macOS. The end-to-end tests on the packaged Windows app |
-| `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
+| `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark and shabad changes, gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
 | `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. The installed Windows app also runs the end-to-end tests. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
 
 ### Darbar Sahib recordings (private)

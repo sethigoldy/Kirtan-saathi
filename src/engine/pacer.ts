@@ -10,6 +10,16 @@
  */
 export const PACE_TIERS = [1, 1.5, 2, 3, 4] as const;
 
+/**
+ * Decode time to report for a window of `windowSec` when hops are budgeted
+ * for windows of `baseWindowSec`. A longer window (kirtan's periodic global
+ * check) counts at the cost of a normal one: its extra time comes once every
+ * few hops, and counting it in full kept the pacer from ever relaxing.
+ */
+export function decodeCostMs(inferMs: number, windowSec: number, baseWindowSec: number): number {
+  return windowSec > baseWindowSec ? (inferMs * baseWindowSec) / windowSec : inferMs;
+}
+
 export interface PacerOptions {
   /** A decode should take at most this fraction of the hop. */
   targetFraction: number;
@@ -18,6 +28,8 @@ export interface PacerOptions {
   relaxAfter: number;
   /** Over target for this many decodes in a row, step up a tier. */
   tightenAfter: number;
+  /** Never run faster than this scale (tests use it to act like a slow computer). */
+  minScale: number;
 }
 
 export const DEFAULT_PACER_OPTIONS: PacerOptions = {
@@ -25,16 +37,21 @@ export const DEFAULT_PACER_OPTIONS: PacerOptions = {
   relaxFraction: 0.35,
   relaxAfter: 20,
   tightenAfter: 3,
+  minScale: 1,
 };
 
 export class Pacer {
   readonly opts: PacerOptions;
-  private tier = 0;
+  private readonly floor: number;
+  private tier: number;
   private over = 0;
   private under = 0;
 
   constructor(opts: Partial<PacerOptions> = {}) {
     this.opts = { ...DEFAULT_PACER_OPTIONS, ...opts };
+    const i = PACE_TIERS.findIndex((s) => s >= this.opts.minScale);
+    this.floor = i < 0 ? PACE_TIERS.length - 1 : i;
+    this.tier = this.floor;
   }
 
   get scale(): number {
@@ -48,7 +65,7 @@ export class Pacer {
   /** Pick a starting tier from a self-test decode of `probeSec` audio. */
   calibrate(probeMs: number, probeSec: number, hopSec: number, windowSec: number): void {
     const expectedMs = (probeMs / probeSec) * windowSec;
-    this.tier = 0;
+    this.tier = this.floor;
     while (this.tier < PACE_TIERS.length - 1 && expectedMs > this.opts.targetFraction * hopSec * 1000 * this.scale) this.tier++;
     this.over = this.under = 0;
   }
@@ -67,7 +84,7 @@ export class Pacer {
     } else if (frac < this.opts.relaxFraction) {
       this.under++;
       this.over = 0;
-      if (this.under >= this.opts.relaxAfter && this.tier > 0) {
+      if (this.under >= this.opts.relaxAfter && this.tier > this.floor) {
         this.tier--;
         this.under = 0;
       }

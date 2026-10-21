@@ -14,10 +14,14 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { AsrModel } from '../engine/asr';
+import { AsrModel, SAMPLE_RATE } from '../engine/asr';
 import { Corpus } from '../engine/corpus';
+import { Engine } from '../engine/engine';
 import { Retriever } from '../engine/retrieval';
+import { loadAudio } from './audio-file';
 import { normalizeGt, runCase } from './bench';
+import { CachedTranscriber } from './cached-asr';
+import { runTransition, shabadOf } from './transition';
 import { evaluatePaath, type PaathMetrics } from './paath-eval';
 import { scoreCase, type GtCase } from './score';
 
@@ -35,6 +39,11 @@ interface Results {
     cases: { id: string; accuracy: number; firstCorrectLockSec: number | null; wrongShabadSec: number }[];
   };
   paath: PaathMetrics[];
+  /** Shabad changes, at each pace (1: normal; 3: a slow computer). */
+  changes?: {
+    pace: number;
+    cases: { from: string; to: string; switchSec: number | null; oldAfterSec: number }[];
+  }[];
   /** Private caption-labelled set (aggregate only). */
   darbar?: { recordings: number; minutes: number; frameAccuracy: number; wrongShabadSec: number; medianFirstLockSec: number };
 }
@@ -44,6 +53,10 @@ interface Thresholds {
   kirtanWrongShabadSecMax: number;
   paathWithin1Min: number;
   paathLagMedianMax: number;
+  /** Every shabad change (whose new shabad the benchmark recognises) is on screen within this many seconds, at every pace. */
+  shabadChangeSecMax?: number;
+  /** The old shabad leaves the screen within this many seconds of a change, at every pace. */
+  oldShabadAfterChangeSecMax?: number;
   /** null: report the private set without gating it (until it has a baseline). */
   darbarFrameAccuracyMin?: number | null;
   darbarWrongShabadSecMax?: number | null;
@@ -54,6 +67,22 @@ const PAATH_RUNS: { name: string; mode: string }[] = [
   { name: 'ang14', mode: 'paath' },
   { name: 'japji', mode: 'bani:JAPJ' },
 ];
+
+/**
+ * Shabad changes: the first 150 s of one benchmark recording, then 150 s of
+ * another. `recognised: false` marks a new shabad the engine rarely
+ * recognises at all (zOtIpxMT9hU); there only the old shabad leaving the
+ * screen is gated. Run at normal pace and at 3× (a slow computer).
+ */
+const CHANGES: { from: string; to: string; recognised: boolean }[] = [
+  { from: 'IZOsmkdmmcg', to: 'kZhIA8P6xWI', recognised: true },
+  { from: 'kZhIA8P6xWI', to: 'kchMJPK9Axs', recognised: true },
+  { from: 'kchMJPK9Axs', to: 'IZOsmkdmmcg', recognised: true },
+  { from: 'zOtIpxMT9hU', to: 'kZhIA8P6xWI', recognised: true },
+  { from: 'kZhIA8P6xWI', to: 'zOtIpxMT9hU', recognised: false },
+];
+const CHANGE_PACES = [1, 3];
+const CHANGE_SEC = 150;
 
 function delta(cur: number, base: number | undefined, digits = 1, higherIsBetter = true): string {
   if (base === undefined || Number.isNaN(base)) return '';
@@ -102,6 +131,24 @@ async function main(): Promise<void> {
     console.log(`paath ${r.name} [${r.mode}]: within-1 ${m.within1}%, lag ${m.lagMedian} s`);
   }
 
+  // Shabad changes.
+  const changes: NonNullable<Results['changes']> = [];
+  const audioOf = (id: string) => loadAudio(join(data, 'audio', `${id}_16k.wav`)).subarray(0, CHANGE_SEC * SAMPLE_RATE);
+  const gtOf = (id: string) => JSON.parse(readFileSync(join(gtDir, `${id}.json`), 'utf8')) as GtCase;
+  for (const pace of CHANGE_PACES) {
+    const out: NonNullable<Results['changes']>[number]['cases'] = [];
+    for (const c of CHANGES) {
+      const asr = new CachedTranscriber(model, cacheDir, `splice-${c.from}-${CHANGE_SEC}-${c.to}-${CHANGE_SEC}`, 0);
+      const engine = new Engine(corpus, retriever, asr, { paceScale: pace });
+      const r = await runTransition(corpus, engine, audioOf(c.from), audioOf(c.to), shabadOf(corpus, gtOf(c.from)), shabadOf(corpus, gtOf(c.to)));
+      asr.save();
+      const switchSec = r.switchSec === null ? null : Math.round(r.switchSec);
+      out.push({ from: c.from, to: c.to, switchSec, oldAfterSec: Math.round(r.oldAfterSec) });
+      console.log(`change ${c.from} > ${c.to} at ${pace}x: new shabad ${switchSec === null ? 'never' : `after ${switchSec} s`}, old shabad ${Math.round(r.oldAfterSec)} s`);
+    }
+    changes.push({ pace, cases: out });
+  }
+
   // Private Darbar Sahib set: aggregate only, no shared cache.
   let darbar: Results['darbar'];
   const privDir = resolve(arg('private', join(data, 'darbar')));
@@ -143,6 +190,7 @@ async function main(): Promise<void> {
       cases,
     },
     paath,
+    changes,
     ...(darbar ? { darbar } : {}),
   };
   writeFileSync(join(out, 'results.json'), JSON.stringify(results, null, 2));
@@ -164,6 +212,17 @@ async function main(): Promise<void> {
   for (const m of paath) {
     if (m.within1 < thresholds.paathWithin1Min) failures.push(`paath ${m.name} within-1 ${m.within1}% < ${thresholds.paathWithin1Min}%`);
     if (m.lagMedian > thresholds.paathLagMedianMax) failures.push(`paath ${m.name} median lag ${m.lagMedian} s > ${thresholds.paathLagMedianMax} s`);
+  }
+  for (const { pace, cases: cc } of changes) {
+    for (const c of cc) {
+      const name = `shabad change ${c.from} > ${c.to} at ${pace}x`;
+      const max = thresholds.shabadChangeSecMax;
+      if (typeof max === 'number' && CHANGES.find((x) => x.from === c.from && x.to === c.to)?.recognised && (c.switchSec === null || c.switchSec > max)) {
+        failures.push(`${name}: new shabad ${c.switchSec === null ? 'never shown' : `shown after ${c.switchSec} s`} (> ${max} s)`);
+      }
+      const old = thresholds.oldShabadAfterChangeSecMax;
+      if (typeof old === 'number' && c.oldAfterSec > old) failures.push(`${name}: old shabad on screen ${c.oldAfterSec} s after the change (> ${old} s)`);
+    }
   }
 
   // Summary (GitHub step summary / PR check).
@@ -195,6 +254,22 @@ async function main(): Promise<void> {
     md.push(`| Frame accuracy | **${darbar.frameAccuracy}%**${delta(darbar.frameAccuracy, bd?.frameAccuracy)} | ${gate(thresholds.darbarFrameAccuracyMin, '%', '≥')} |`);
     md.push(`| Time on a wrong shabad | ${darbar.wrongShabadSec} s${delta(darbar.wrongShabadSec, bd?.wrongShabadSec, 0, false)} | ${gate(thresholds.darbarWrongShabadSecMax, ' s', '≤')} |`);
     md.push(`| Median first correct lock | ${darbar.medianFirstLockSec} s${delta(darbar.medianFirstLockSec, bd?.medianFirstLockSec, 0, false)} | — |`);
+    md.push('');
+  }
+  if (changes.length) {
+    md.push(`| Shabad change (150 s, then 150 s) | ${changes.map((x) => `New shabad at ${x.pace}×`).join(' | ')} | ${changes.map((x) => `Old shabad at ${x.pace}×`).join(' | ')} |`);
+    md.push(`|---|${changes.map(() => '---|').join('')}${changes.map(() => '---|').join('')}`);
+    for (const c of CHANGES) {
+      const row = changes.map((x) => x.cases.find((y) => y.from === c.from && y.to === c.to)!);
+      const shown = row.map((y) => (y.switchSec === null ? 'never' : `${y.switchSec} s`));
+      md.push(`| ${c.from} > ${c.to}${c.recognised ? '' : ' (rarely recognised)'} | ${shown.join(' | ')} | ${row.map((y) => `${y.oldAfterSec} s`).join(' | ')} |`);
+    }
+    const gates = [
+      typeof thresholds.shabadChangeSecMax === 'number' ? `new shabad shown within ${thresholds.shabadChangeSecMax} s` : '',
+      typeof thresholds.oldShabadAfterChangeSecMax === 'number' ? `old shabad gone within ${thresholds.oldShabadAfterChangeSecMax} s` : '',
+    ].filter(Boolean);
+    md.push('');
+    md.push(`Gates, at every pace: ${gates.join('; ') || 'report only'}. 3× is how a slow computer runs.`);
     md.push('');
   }
   md.push('<details><summary>Kirtan cases</summary>');
