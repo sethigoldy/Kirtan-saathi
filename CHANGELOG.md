@@ -2,6 +2,12 @@
 
 What changed in each release. When a version is released, its section becomes the *What's new* part of the GitHub release, and the app shows the same list when it offers the update. The release workflow does not publish a version without a section here.
 
+## 0.3.0
+
+- **English meaning.** Show the English translation under the tuk, alone or with the Punjabi arth or its Hindi-script version (Screen → Meaning). Each source is credited on screen, e.g. Translation: Dr. Sant Singh Khalsa.
+- **Kirtan Saathi in Punjabi.** App → Language → ਪੰਜਾਬੀ puts the app's buttons and messages in Punjabi, along with the source line on every screen (ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ · ਰਾਗੁ ਸੋਰਠਿ · ਅੰਗ ੬੨੮) and the phone page. Gurbani and the meanings are unchanged.
+- **Meaning on phones.** A reader's own meaning choice on the phone page now shows even when the projector shows no meaning.
+
 ## 0.2.0
 
 - **Update notices.** When the computer is online, Kirtan Saathi checks for a new version and shows what changed. On Windows it can update itself: press Update now, or turn on Install updates automatically (under App). Updates install when you close the app, never during kirtan.
