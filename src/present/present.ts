@@ -23,6 +23,9 @@ const ROLE_RAHAO = 1;
 const ROLE_HEADER = 2;
 const ROLE_MANGAL = 3;
 
+/** Shown while searching, instead of an empty screen. */
+const WAHEGURU = 'ਵਾਹਿਗੁਰੂ';
+
 const layout: Layout = (['projector', 'overlay', 'follow'] as const).find((l) => location.pathname === `/${l}`) ?? 'follow';
 const query = new URLSearchParams(location.search);
 const root = document.documentElement;
@@ -155,11 +158,22 @@ function renderStage(v: DisplayView): void {
   const hindi = hindiMode(v);
   const changed = cur.dataset.line !== String(v.current?.line ?? '');
   cur.dataset.line = String(v.current?.line ?? '');
-  renderLine(cur, v.current, hindi, meaningMode(v));
+  const idle = !v.current && (flag('waheguru') ?? v.settings.waheguru);
+  if (idle) {
+    cur.textContent = '';
+    const gu = document.createElement('div');
+    gu.className = 'gu';
+    gu.lang = 'pa';
+    gu.textContent = WAHEGURU;
+    cur.append(gu);
+  } else {
+    renderLine(cur, v.current, hindi, meaningMode(v));
+  }
+  cur.classList.toggle('waheguru', idle);
   cur.classList.toggle('rahao', v.current?.role === ROLE_RAHAO);
   renderLine(next, showNext(v) ? v.next : null, hindi);
-  src.textContent = showSource(v) ? [v.source, meaningMode(v) !== 'off' ? v.credit : ''].filter(Boolean).join(' · ') : '';
-  stage.classList.toggle('empty', !v.current);
+  src.textContent = showSource(v) && !idle ? [v.source, meaningMode(v) !== 'off' ? v.credit : ''].filter(Boolean).join(' · ') : '';
+  stage.classList.toggle('empty', !v.current && !idle);
   if (layout === 'projector') {
     fit(cur, window.innerHeight * (next.textContent ? 0.55 : 0.75));
     fit(next, window.innerHeight * 0.22);

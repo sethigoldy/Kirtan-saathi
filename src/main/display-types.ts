@@ -12,6 +12,8 @@ export interface PresentationSettings {
   nextLine: boolean;
   /** Show source, raag and page under the line. */
   showSource: boolean;
+  /** Show ਵਾਹਿਗੁਰੂ on the projector and overlay while no line is on screen (searching). */
+  waheguru: boolean;
   /** Multiplier on the base font size. */
   fontScale: number;
   /** Devanagari (Hindi script) transliteration: under the Gurmukhi, or instead of it. */
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: PresentationSettings = {
   vishraam: true,
   nextLine: true,
   showSource: true,
+  waheguru: true,
   fontScale: 1,
   hindi: 'off',
   meaning: 'off',

@@ -481,6 +481,7 @@ function renderView(v: DisplayView): void {
   $<HTMLInputElement>('opt-larivaar').checked = st.larivaar;
   $<HTMLInputElement>('opt-next').checked = st.nextLine;
   $<HTMLInputElement>('opt-source').checked = st.showSource;
+  $<HTMLInputElement>('opt-waheguru').checked = st.waheguru;
 }
 
 function renderStatus(s: PresentStatus): void {
@@ -570,6 +571,7 @@ $('opt-vishraam').addEventListener('change', (e) => setting({ vishraam: (e.targe
 $('opt-larivaar').addEventListener('change', (e) => setting({ larivaar: (e.target as HTMLInputElement).checked }));
 $('opt-next').addEventListener('change', (e) => setting({ nextLine: (e.target as HTMLInputElement).checked }));
 $('opt-source').addEventListener('change', (e) => setting({ showSource: (e.target as HTMLInputElement).checked }));
+$('opt-waheguru').addEventListener('change', (e) => setting({ waheguru: (e.target as HTMLInputElement).checked }));
 $('opt-lan').addEventListener('change', (e) => void P.setLan((e.target as HTMLInputElement).checked));
 $('blank').addEventListener('click', () => void P.control(view?.blank ? 'unblank' : 'blank'));
 $('prev').addEventListener('click', () => void P.control('prev'));
