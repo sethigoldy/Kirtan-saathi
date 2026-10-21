@@ -2,7 +2,7 @@
 
 | Your computer | Download this file |
 |---|---|
-| **Windows 10 or 11** | `Kirtan-Saathi-Setup-{{VERSION}}.exe` |
+| **Windows 10 or 11** | **[Microsoft Store](https://apps.microsoft.com/detail/9PPGF42F3MDN)** (recommended), or `Kirtan-Saathi-Setup-{{VERSION}}.exe` |
 | **Mac with Apple chip** (M1, M2, M3, M4 …) | `Kirtan-Saathi-{{VERSION}}-Mac-Apple-Silicon.dmg` |
 | **Mac with Intel processor** | `Kirtan-Saathi-{{VERSION}}-Mac-Intel.dmg` |
 | **Ubuntu / Debian Linux** | the file ending in `.deb` |
@@ -12,6 +12,8 @@ Not sure which Mac you have? Click the Apple menu → **About This Mac**. If it 
 Everything the app needs (speech model, Gurbani, meanings) is inside the download. After installing, it works without internet.
 
 ## Install on Windows
+
+The easiest way is the **[Microsoft Store](https://apps.microsoft.com/detail/9PPGF42F3MDN)**: click **Get**. There is no security warning, and the Store installs every new version for you. To use the setup wizard instead:
 
 1. Double-click `Kirtan-Saathi-Setup-{{VERSION}}.exe`.
 2. If a blue box says **"Windows protected your PC"**: click **More info**, then **Run anyway**. (This appears because the app is new and not yet code-signed.)
