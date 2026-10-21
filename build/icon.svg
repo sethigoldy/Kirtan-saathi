@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <!-- Kirtan Saathi app icon: an open pothi on a rumala, with the sound of
        the recitation rising from it as a waveform. scripts/make-icons.mjs
-       renders it to icon.png, icon.ico, icon.icns and the Store tiles
+       renders it (npm run icon) to icon.png, icon.ico, icon.icns and the Store tiles
        (appx/); the operator window's logo is a small copy (static/index.html). -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">

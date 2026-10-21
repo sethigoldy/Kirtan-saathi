@@ -5,7 +5,7 @@
 //   build/appx/      Microsoft Store tiles (the pothi and waveform alone on
 //                    the tile colour for the Start tiles)
 //
-//   node scripts/make-icons.mjs
+//   npm run icon
 //
 // Needs a Chromium for Playwright: `npx playwright install chromium`, or set
 // CHROMIUM to a Chromium or Chrome executable.

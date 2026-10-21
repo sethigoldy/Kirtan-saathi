@@ -76,13 +76,18 @@ nsis:
   runAfterFinish: true
   deleteAppDataOnUninstall: false
   artifactName: Kirtan-Saathi-Setup-${version}.${ext}
-# Microsoft Store package. The release workflow builds it from the unpacked
-# Windows app (--prepackaged) and passes the package identity Partner Center
-# assigns (identityName, publisher, publisherDisplayName) from repository
-# variables; see README → Microsoft Store. The Store signs the package, so
-# people installing from the Store see no SmartScreen warning. Tile images
-# are in build/appx/.
+# Microsoft Store package (Store ID 9PPGF42F3MDN). The release workflow builds
+# it from the unpacked Windows app (--prepackaged); see README → Microsoft
+# Store. The Store signs the package, so people installing from the Store see
+# no SmartScreen warning. Tile images are in build/appx/.
 appx:
+  # Partner Center → Product management → Product identity.
+  identityName: KirtanSaathi.KirtanSaathi
+  publisher: CN=7DCEC9F8-8452-4ED2-8BAF-1212EEB1ACCA
+  publisherDisplayName: Kirtan Saathi
+  # Windows 10 1809 or later (the Store needs at least 1607 for full-trust apps).
+  minVersion: 10.0.17763.0
+  maxVersionTested: 10.0.17763.0
   applicationId: KirtanSaathi
   displayName: Kirtan Saathi
   backgroundColor: "#11204e"

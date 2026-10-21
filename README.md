@@ -303,35 +303,6 @@ To get a test build without tagging, use *Actions → Installers → Run workflo
 
 Build installers locally with `npm run dist`. Output goes to `release/`.
 
-### Microsoft Store
-
-The Store signs the apps it distributes, so people who install from the Store see no SmartScreen warning. The Windows job of the installers workflow builds the Store package (`.appx`) from the same app as the setup wizard. It then installs a test-signed copy and runs the smoke test and the end-to-end tests against it, with the update checks replaced by a check that the Store copy never asks GitHub.
-
-One-time setup:
-
-1. Register as an individual developer at <https://storedeveloper.microsoft.com>. It is free; Microsoft verifies a government ID and a selfie.
-2. In Partner Center, create an app and reserve the name *Kirtan Saathi*.
-3. Open the app's *Product management → Product identity* page. Add three repository variables (*Settings → Secrets and variables → Actions → Variables*):
-
-   | Variable | Product identity value |
-   |---|---|
-   | `STORE_IDENTITY_NAME` | `Package/Identity/Name` |
-   | `STORE_PUBLISHER` | `Package/Identity/Publisher` |
-   | `STORE_PUBLISHER_NAME` | `Package/Properties/PublisherDisplayName` |
-
-   Without them, the package gets a test identity: it is built and tested, but not kept.
-
-For each version:
-
-1. Get the package. Releases keep it once the variables exist. For a version released before that, use *Actions → Installers → Run workflow* on its tag, with *prerelease* unticked. The run's `microsoft-store-package` artifact holds `Kirtan-Saathi-<version>-Microsoft-Store.appx`.
-2. In Partner Center, start a submission (the first one, or *Update* on the last) and upload the `.appx` under *Packages*.
-3. The first submission also needs:
-   - **Privacy policy URL:** <https://github.com/sethigoldy/Kirtan-saathi/blob/main/PRIVACY.md>
-   - **Store listing:** a description and screenshots (`docs/screenshots/`).
-   - **Age rating questionnaire.**
-   - **Why the app needs `runFullTrust`:** *Kirtan Saathi is a desktop (Electron) app packaged with MSIX. It runs its speech recognition and its local presentation server as a desktop process.*
-4. Submit for certification. The Store then updates installed copies.
-
 Benchmark outputs:
 
 - **Where results appear:** in the job summary and as a sticky comment on the pull request.
@@ -339,6 +310,23 @@ Benchmark outputs:
 - **Run time:** the first run decodes ~90 min of audio (allow up to 2 h). Later runs reuse the decode cache.
 
 When a change is an intended improvement, update `ci/baseline.json` in the same pull request (copy `bench-results/results.json`).
+
+### Microsoft Store
+
+The Store signs the apps it distributes, so people who install from the Store see no SmartScreen warning. The Windows job of the installers workflow builds the Store package (`.appx`) from the same app as the setup wizard. It then installs a test-signed copy and runs the smoke test and the end-to-end tests against it, with the update checks replaced by a check that the Store copy never asks GitHub.
+
+The app is registered in Partner Center as *Kirtan Saathi* (Store ID `9PPGF42F3MDN`, an *MSIX or PWA app*). Its package identity from *Product management → Product identity* is in the `appx` section of `electron-builder.yml`.
+
+For each version:
+
+1. Get the package: open the installers run that published the release (*Actions → Installers*) and download its `microsoft-store-package` artifact, `Kirtan-Saathi-<version>-Microsoft-Store.appx`. Every run except pull requests keeps it, so *Run workflow* on `main` also produces one.
+2. In Partner Center, start a submission (the first one, or *Update* on the last) and upload the `.appx` under *Packages*. Each submission needs a higher version than the last.
+3. The first submission also needs:
+   - **Privacy policy URL:** <https://github.com/sethigoldy/Kirtan-saathi/blob/main/PRIVACY.md>
+   - **Store listing:** the text in `docs/store/listing.md` and the screenshots in `docs/store/` (taken by `src/e2e/screenshots.ts`).
+   - **Age rating questionnaire.**
+   - **Why the app needs `runFullTrust`:** *Kirtan Saathi is a desktop (Electron) app packaged with MSIX. It runs its speech recognition and its local presentation server as a desktop process.*
+4. Submit for certification. The Store then updates installed copies.
 
 ## Project layout
 
@@ -357,7 +345,7 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | `src/main/` | Electron main, preload, engine utility process, message protocol, display state, presentation server, projector window, settings, meanings |
 | `src/present/`, `static/present/` | Projector / overlay / phone page, Gurmukhi formatting and Devanagari transliteration |
 | `src/renderer/`, `static/` | Operator window, audio capture worklet, styles |
-| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon (`build/icon.svg`; `node scripts/make-icons.mjs` renders the PNG, ICO, ICNS and Store tiles), macOS entitlements |
+| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon (`build/icon.svg`; `npm run icon` renders the PNG, ICO, ICNS and Store tiles), macOS entitlements |
 | `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score`, `caption-label`, `caption-pack`, `caption-eval`, `darbar-batch` |
 | `src/test/` | Unit tests (`npm test`) |
 | `src/e2e/` | End-to-end tests of the running app (`npm run e2e`) |

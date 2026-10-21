@@ -21,7 +21,7 @@
     "ci-bench": "node dist/cli/ci-bench.js",
     "soak": "node dist/cli/soak.js",
     "dist": "npm run build && electron-builder --publish never",
-    "icon": "python3 scripts/make-icon.py",
+    "icon": "node scripts/make-icons.mjs",
     "darbar-batch": "node dist/cli/darbar-batch.js",
     "e2e": "npm run build && node --test --test-concurrency=1 --test-reporter=spec \"dist/e2e/*.e2e.js\""
   },
