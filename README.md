@@ -357,7 +357,7 @@ When a change is an intended improvement, update `ci/baseline.json` in the same 
 | `src/main/` | Electron main, preload, engine utility process, message protocol, display state, presentation server, projector window, settings, meanings |
 | `src/present/`, `static/present/` | Projector / overlay / phone page, Gurmukhi formatting and Devanagari transliteration |
 | `src/renderer/`, `static/` | Operator window, audio capture worklet, styles |
-| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon (`build/icon.svg`; `node scripts/make-icons.mjs` renders the PNG, ICO, ICNS and Store tiles), macOS entitlements |
+| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon (`build/icon.svg`; `npm run icon` renders the PNG, ICO, ICNS and Store tiles), macOS entitlements |
 | `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score`, `caption-label`, `caption-pack`, `caption-eval`, `darbar-batch` |
 | `src/test/` | Unit tests (`npm test`) |
 | `src/e2e/` | End-to-end tests of the running app (`npm run e2e`) |
