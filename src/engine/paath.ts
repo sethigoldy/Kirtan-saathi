@@ -20,6 +20,11 @@ export interface PaathOptions {
   aheadLines: number;
   /** Minimum fraction of the recent audio explained to accept a position. */
   minScore: number;
+  /**
+   * Fraction needed to move the display to another line. Below it the line
+   * already shown stays (the reader's position is still tracked).
+   */
+  moveScore: number;
   /** Key units matched into the next line before the display moves there. */
   minCharsInto: number;
   /**
@@ -56,6 +61,7 @@ export const DEFAULT_PAATH_OPTIONS: PaathOptions = {
   behindLines: 4,
   aheadLines: 6,
   minScore: 0.45,
+  moveScore: 0.6,
   minCharsInto: 3,
   skipCharsInto: 6,
   skipUpdates: 2,
@@ -219,6 +225,7 @@ export class PaathFollower {
     }
     this.misses = 0;
     const idx = from + r.endIndex;
+    if (idx !== this.pos && r.score < o.moveScore) return { line: this.line, score: r.score, held: false, lost: false };
     if (idx === this.pos + 1 || (idx > this.pos + 1 && this.onlyShortBetween(this.pos, idx))) {
       // Next line (possibly past short headings): move once a word or so is read.
       if (r.endInto >= Math.min(o.minCharsInto, r.endLineLength)) this.pos = idx;

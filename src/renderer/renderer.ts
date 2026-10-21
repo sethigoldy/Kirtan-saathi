@@ -209,7 +209,8 @@ function onEngine(msg: FromEngine): void {
       break;
     case 'event': {
       const ev = msg.ev;
-      if (ev.state === 'locked') setStatus('locked', `Following (${(ev.confidence * 100).toFixed(0)}% sure)`);
+      // Locks report evidence rather than a probability, so cap at 100%.
+      if (ev.state === 'locked') setStatus('locked', `Following (${Math.round(Math.min(1, ev.confidence) * 100)}% sure)`);
       else if (ev.state === 'searching') setStatus('searching', 'Listening for the shabad…');
       mode = ev.mode;
       streamName = ev.stream;

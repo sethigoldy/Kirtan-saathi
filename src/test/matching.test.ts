@@ -6,7 +6,7 @@ import { Aligner, RepeatAligner, selfScore } from '../engine/align';
 import { Corpus } from '../engine/corpus';
 import { encodeKey, toKey } from '../engine/gurmukhi';
 import { Retriever } from '../engine/retrieval';
-import { LineTracker } from '../engine/tracker';
+import { DEFAULT_TRACKER_OPTIONS, LineTracker } from '../engine/tracker';
 
 const CORPUS = join(__dirname, '..', '..', 'resources', 'corpus.json.gz');
 let corpus: Corpus;
@@ -90,6 +90,28 @@ test('tracker follows lines in order and returns to the rahao', () => {
   assert.equal(feed(lines[3], 4), lines[3]);
   // Back to the refrain.
   assert.equal(feed(lines[0], 4), lines[0]);
+});
+
+test('tracker changes the displayed line only at 60% or more', () => {
+  const o = DEFAULT_TRACKER_OPTIONS;
+  assert.ok(Math.min(o.showPosterior, o.switchPosterior, o.instantPosterior) >= 0.6, 'showing, switching and instant switching all need 60%');
+  const first = findLine('ਪੋਥੀ ਪਰਮੇਸਰ ਕਾ ਥਾਨੁ ॥');
+  const tracker = new LineTracker(corpus, retriever, corpus.shabadOf[first], null);
+  const lines = tracker.lines;
+  let shown: number | null = null, changes = 0, unsure = 0;
+  for (let i = 0; i < 200; i++) {
+    // Noisy singing that wanders between lines, as in a busy kirtan.
+    const line = lines[(i * 7 + (i >> 3)) % lines.length];
+    const upd = tracker.update(corrupt(corpus.key[line], 0.35, i + 1));
+    if (upd.posterior < 0.6) unsure++;
+    if (upd.line !== shown) {
+      changes++;
+      assert.ok(upd.posterior >= 0.6, `update ${i}: moved to ${upd.line} at ${(upd.posterior * 100).toFixed(0)}%`);
+      shown = upd.line;
+    }
+  }
+  assert.ok(changes > 3, `the line changed ${changes} times`);
+  assert.ok(unsure > 0, 'some updates were unsure');
 });
 
 test('tracker holds the display during instrumental passages', () => {
