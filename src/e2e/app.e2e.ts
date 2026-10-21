@@ -18,6 +18,10 @@ import { translate } from '../present/ui-words';
 import { JAPJI_WAV, launch, launchSecond, plain, releases, sleep, snap, state, until, VERSION, type App } from './harness';
 
 const LONG = 240_000;
+/** Set by the installers workflow when KIRTAN_APP is the installed Microsoft Store package. */
+const STORE = process.env.E2E_EXPECT_STORE === '1';
+/** Update checks that apply only to copies that do (or do not) come from the Microsoft Store. */
+const GITHUB_ONLY = { skip: STORE && 'the Microsoft Store updates this copy' };
 const POTHI = 'ਪੋਥੀ ਪਰਮੇਸਰ ਕਾ ਥਾਨੁ ॥';
 
 let k: App;
@@ -35,8 +39,8 @@ const NEWER = {
 };
 
 /** A check that saves screenshots of every window when it fails. */
-function check(name: string, fn: () => Promise<void>, opts: { timeout?: number; todo?: string } = {}): void {
-  it(name, { timeout: opts.timeout ?? 120_000, todo: opts.todo }, async () => {
+function check(name: string, fn: () => Promise<void>, opts: { timeout?: number; todo?: string; skip?: string | false } = {}): void {
+  it(name, { timeout: opts.timeout ?? 120_000, todo: opts.todo, skip: opts.skip }, async () => {
     try {
       await fn();
     } catch (e) {
@@ -64,6 +68,12 @@ async function recordCaptures(p: Page): Promise<void> {
 }
 
 const captures = () => page().evaluate(() => (window as unknown as { __captures: { asked: string; got: string }[] }).__captures);
+/** Whether the waveform in the logo moves (it stays still when Windows or macOS asks for reduced motion). */
+const logoMoves = () =>
+  page().evaluate(() => {
+    const bars = Array.from(document.querySelectorAll('.mark .wave line'));
+    return { moving: bars.filter((b) => b.getAnimations().length > 0).length, still: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  });
 
 describe('Kirtan Saathi app', () => {
   before(async () => {
@@ -147,6 +157,7 @@ describe('Kirtan Saathi app', () => {
     await page().click('#mic');
     await until('the button to read Stop listening', () => text('#mic'), (t) => t === 'Stop listening');
     await until('the input level meter to move', level, (l) => l > 0, 10_000);
+    await until('the logo waveform to move while listening', logoMoves, (m) => m.moving === (m.still ? 0 : 5));
     await page().waitForSelector('#lines li.current', { timeout: 150_000 });
     assert.match(await text('#status-text'), /^Following/);
     const v = await until('the screens to show a line', now, (x) => x.current !== null);
@@ -190,6 +201,7 @@ describe('Kirtan Saathi app', () => {
     await until('the button to read Start listening', () => text('#mic'), (t) => t === 'Start listening');
     assert.equal(await text('#status-text'), 'Not listening');
     assert.equal(await level(), 0);
+    assert.equal((await logoMoves()).moving, 0, 'the logo is still when not listening');
     assert.ok((await page().$$('#lines li')).length > 0, 'the shabad stays on screen');
   });
 
@@ -617,13 +629,37 @@ describe('Kirtan Saathi app', () => {
     assert.equal(await text('#update-title'), 'Kirtan Saathi 99.0.0 is available');
     assert.deepEqual(await page().$$eval('#update-notes li', (l) => l.map((x) => x.textContent)), ['English meaning under the tuk', 'Full Punjabi app']);
     const st = await updates();
+    assert.equal(st.store, false);
+    assert.equal(await page().isVisible('#update-switches'), true);
     assert.equal(await page().isVisible('#update-install'), st.canInstall, 'Update now where the app can update itself');
     assert.equal(await page().isVisible('#update-download'), !st.canInstall, 'otherwise a link to the download');
     assert.equal(await page().isDisabled('#opt-update-auto'), !st.canInstall);
     await page().click('#update-later');
     await until('Later to hide the notice', () => page().isHidden('#update'), (h) => h);
     assert.match(await text('#update-state'), /Version 99\.0\.0 is available/);
-  });
+  }, GITHUB_ONLY);
+
+  check('leaves updates to the Microsoft Store', async () => {
+    await page().click('[data-tab="app"]');
+    assert.equal(await text('#app-version'), `Kirtan Saathi ${VERSION}`);
+    const st = await updates();
+    assert.equal(st.store, true, 'the installed package runs as a Microsoft Store app');
+    assert.equal(st.canInstall, false);
+    assert.equal(await text('#update-auto-hint'), 'The Microsoft Store keeps Kirtan Saathi up to date.');
+    assert.equal(await page().isHidden('#update-switches'), true);
+    assert.equal(await page().isHidden('#update-check-row'), true);
+    // Neither the connection coming back nor an explicit check asks GitHub.
+    releases.answer = NEWER;
+    const asked = releases.asked;
+    await page().evaluate(() => window.dispatchEvent(new Event('online')));
+    await page().evaluate(() => (window as unknown as { updates: { check(manual: boolean): Promise<void> } }).updates.check(true));
+    await sleep(2000);
+    assert.equal(releases.asked, asked, 'no request for the latest release');
+    assert.equal((await updates()).state, 'idle');
+    assert.equal(await page().isHidden('#update'), true, 'no update notice');
+    releases.answer = { tag_name: `v${VERSION}` };
+    await page().click('[data-tab="screen"]');
+  }, { skip: !STORE && 'only copies from the Microsoft Store' });
 
   check('reports a failed check when asked, and stays quiet otherwise', async () => {
     releases.status = 500;
@@ -640,7 +676,7 @@ describe('Kirtan Saathi app', () => {
     await page().click('#update-check');
     await page().waitForSelector('#update:not([hidden])', { timeout: 15_000 });
     assert.equal(await text('#update-title'), 'Kirtan Saathi 99.0.0 is available', 'Check now shows a release dismissed with Later again');
-  });
+  }, GITHUB_ONLY);
 
   check('downloads the update where the app can update itself', async () => {
     const st = await updates();
@@ -662,7 +698,7 @@ describe('Kirtan Saathi app', () => {
     assert.equal(await text('#update-install'), 'Restart and update');
     assert.equal(await page().isHidden('#update-download'), true);
     // Test downloads are never installed (KIRTAN_SAATHI_UPDATE_FEED), so the restart below stays on this version.
-  }, { timeout: 120_000 });
+  }, { timeout: 120_000, ...GITHUB_ONLY });
 
   check('keeps the update settings', async () => {
     const st = await updates();
@@ -675,7 +711,7 @@ describe('Kirtan Saathi app', () => {
     releases.answer = { tag_name: `v${VERSION}` };
     releases.feed = null;
     await page().click('[data-tab="screen"]');
-  });
+  }, GITHUB_ONLY);
 
   // ---------- Restart ----------
 
@@ -691,14 +727,19 @@ describe('Kirtan Saathi app', () => {
     assert.equal(await page().isChecked('#opt-lan'), false);
     assert.equal(await text('#proj-toggle'), 'Show', 'the projector stays off');
     const up = await updates();
-    assert.equal(up.prefs.check, false, 'update checks stay off');
-    assert.equal(up.prefs.auto, up.canInstall, 'automatic updates stay on where the app can update itself');
-    assert.equal(up.state, 'idle', 'no check while checks are off');
-    assert.equal(await page().isChecked('#opt-update-check'), false);
-    await page().click('[data-tab="app"]');
-    await page().click('label:has(#opt-update-check)');
-    await until('checks back on', async () => (await updates()).prefs.check, (c) => c);
-    await page().click('[data-tab="screen"]');
+    if (STORE) {
+      assert.equal(up.store, true);
+      assert.equal(up.state, 'idle', 'no update check in the Store package');
+    } else {
+      assert.equal(up.prefs.check, false, 'update checks stay off');
+      assert.equal(up.prefs.auto, up.canInstall, 'automatic updates stay on where the app can update itself');
+      assert.equal(up.state, 'idle', 'no check while checks are off');
+      assert.equal(await page().isChecked('#opt-update-check'), false);
+      await page().click('[data-tab="app"]');
+      await page().click('label:has(#opt-update-check)');
+      await until('checks back on', async () => (await updates()).prefs.check, (c) => c);
+      await page().click('[data-tab="screen"]');
+    }
   }, { timeout: LONG });
 
   check('a second launch keeps the running app', async () => {

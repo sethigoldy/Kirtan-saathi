@@ -9,12 +9,19 @@
 <body>
   <header class="bar">
     <div class="brand">
+      <!-- The app icon (build/icon.svg) in small: an open pothi with the recitation rising from it. -->
       <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
-        <circle cx="12" cy="24" r="3.4" />
-        <path d="M18 17.5a9 9 0 0 1 0 13M22.5 13a15 15 0 0 1 0 22" />
-        <rect x="28" y="15" width="14" height="4" rx="2" class="dim" />
-        <rect x="28" y="22" width="17" height="4" rx="2" />
-        <rect x="28" y="29" width="11" height="4" rx="2" class="dim" />
+        <g class="wave">
+          <line x1="14" y1="10" x2="14" y2="15" class="dim" />
+          <line x1="19" y1="7.5" x2="19" y2="17.5" />
+          <line x1="24" y1="5" x2="24" y2="20" />
+          <line x1="29" y1="7.5" x2="29" y2="17.5" />
+          <line x1="34" y1="10" x2="34" y2="15" class="dim" />
+        </g>
+        <path class="rumala" d="M9 35 Q24 33.6 39 35 L41.5 41 Q24 42.6 6.5 41 Z" />
+        <path class="page" d="M24 25.5 Q17.5 23.5 10.5 24.5 L10.5 36 Q17.5 35 24 37 Z M24 25.5 Q30.5 23.5 37.5 24.5 L37.5 36 Q30.5 35 24 37 Z" />
+        <path class="text" d="M13 28.2 Q17.5 27.4 21.5 28.4 M13 31.6 Q17.5 30.8 21.5 31.8 M26.5 28.4 Q30.5 27.4 35 28.2" />
+        <path class="text lit" d="M26.5 31.8 Q30.5 30.8 35 31.6" />
       </svg>
       <span data-i18n="Kirtan Saathi">Kirtan Saathi</span>
     </div>
@@ -172,12 +179,12 @@
         <section class="group">
           <h2 data-i18n="Updates">Updates</h2>
           <p id="app-version" class="version"></p>
-          <div class="switches">
+          <div class="switches" id="update-switches">
             <label class="switch"><input type="checkbox" id="opt-update-check" /><span class="track"></span><span data-i18n="Check for updates when online">Check for updates when online</span></label>
             <label class="switch"><input type="checkbox" id="opt-update-auto" /><span class="track"></span><span data-i18n="Install updates automatically">Install updates automatically</span></label>
           </div>
           <p id="update-auto-hint" class="hint">Updates download in the background and install when you close Kirtan Saathi, never during kirtan.</p>
-          <div class="field-row"><button id="update-check" data-i18n="Check now">Check now</button></div>
+          <div class="field-row" id="update-check-row"><button id="update-check" data-i18n="Check now">Check now</button></div>
           <p id="update-state" class="hint" role="status"></p>
         </section>
       </div>
