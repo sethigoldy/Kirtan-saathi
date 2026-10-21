@@ -14,6 +14,7 @@ directories:
 files:
   - dist/**/*
   - "!dist/test/**"
+  - "!dist/e2e/**"
   - "!dist/renderer-build/**"
   - "!**/*.map"
   - package.json

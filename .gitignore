@@ -8,5 +8,6 @@ bench-out/
 smoke.png
 .bench-data/
 bench-results/
+e2e-results/
 release/
 darbar-data/
