@@ -6,13 +6,12 @@ name: Installers
 # against a recorded Japji Sahib paath before anything is published. The
 # installed Windows app also passes the end-to-end tests (src/e2e/).
 #
-# The Windows job also builds the Microsoft Store package (.appx), installs a
-# test-signed copy and runs the same checks against it. With the repository
-# variables STORE_IDENTITY_NAME, STORE_PUBLISHER and STORE_PUBLISHER_NAME
-# (Partner Center → Product identity; README → Microsoft Store) the package
-# carries the Store identity and is kept as the "microsoft-store-package"
-# artifact, ready to upload to Partner Center. It is not a release asset:
-# Windows installs only signed packages, and the Store signs it.
+# The Windows job also builds the Microsoft Store package (.appx, identity in
+# electron-builder.yml), installs a test-signed copy and runs the same checks
+# against it. Except on pull requests, the package is kept as the
+# "microsoft-store-package" artifact, ready to upload to Partner Center
+# (README → Microsoft Store). It is not a release asset: Windows installs only
+# signed packages, and the Store signs it.
 #
 #   Merge to main with a new "version" in package.json -> GitHub Release vX.Y.Z
 #                                     (the tag is created by this workflow; versions
@@ -228,21 +227,13 @@ jobs:
       - name: Microsoft Store package
         if: runner.os == 'Windows'
         shell: bash
-        env:
-          STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
-          STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
-          STORE_PUBLISHER_NAME: ${{ vars.STORE_PUBLISHER_NAME }}
         run: |
           set -euo pipefail
-          # Without the Partner Center identity, a test identity: the package is
-          # built and tested, not kept for upload.
-          echo "STORE_NAME=${STORE_IDENTITY_NAME:-KirtanSaathi.Test}" >> "$GITHUB_ENV"
-          echo "STORE_PUBLISHER=${STORE_PUBLISHER:-CN=Kirtan Saathi Test}" >> "$GITHUB_ENV"
-          npx electron-builder --win appx --x64 --prepackaged release/win-unpacked --publish never \
-            "-c.appx.identityName=${STORE_IDENTITY_NAME:-KirtanSaathi.Test}" \
-            "-c.appx.publisher=${STORE_PUBLISHER:-CN=Kirtan Saathi Test}" \
-            "-c.appx.publisherDisplayName=${STORE_PUBLISHER_NAME:-Kirtan Saathi contributors}"
+          npx electron-builder --win appx --x64 --prepackaged release/win-unpacked --publish never
           ls -la release/*.appx
+          # The package identity, for installing the test copy below.
+          echo "STORE_NAME=$(sed -n 's/^  identityName: //p' electron-builder.yml)" >> "$GITHUB_ENV"
+          echo "STORE_PUBLISHER=$(sed -n 's/^  publisher: //p' electron-builder.yml)" >> "$GITHUB_ENV"
 
       - name: Install and run (Microsoft Store package)
         if: runner.os == 'Windows'
@@ -293,7 +284,7 @@ jobs:
           npm run e2e
 
       - name: Keep the Microsoft Store package
-        if: runner.os == 'Windows' && vars.STORE_IDENTITY_NAME != ''
+        if: runner.os == 'Windows' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: microsoft-store-package
