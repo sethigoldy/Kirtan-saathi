@@ -9,9 +9,10 @@ name: Installers
 # The Windows job also builds the Microsoft Store package (.appx, identity in
 # electron-builder.yml), installs a test-signed copy and runs the same checks
 # against it. Except on pull requests, the package is kept as the
-# "microsoft-store-package" artifact, ready to upload to Partner Center
-# (README → Microsoft Store). It is not a release asset: Windows installs only
-# signed packages, and the Store signs it.
+# "microsoft-store-package" artifact. It is not a release asset: Windows
+# installs only signed packages, and the Store signs it. After a release, the
+# "store" job submits it to Partner Center when the Partner Center API secrets
+# are set (README → Microsoft Store); otherwise it is uploaded by hand.
 #
 #   Merge to main with a new "version" in package.json -> GitHub Release vX.Y.Z
 #                                     (the tag is created by this workflow; versions
@@ -403,3 +404,48 @@ jobs:
           } > notes.md
           gh release create "$tag" dist-installers/* --title "$title" --notes-file notes.md "${flags[@]}"
           echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
+
+  # Submits the release's Store package to Partner Center (Store ID
+  # 9PPGF42F3MDN); the Store publishes it after certification. Needs the
+  # secrets AZURE_AD_TENANT_ID, AZURE_AD_APPLICATION_CLIENT_ID,
+  # AZURE_AD_APPLICATION_SECRET and SELLER_ID, and an app that is already live.
+  store:
+    name: Submit to the Microsoft Store
+    needs: [plan, build, release]
+    if: needs.plan.outputs.publish == 'true' && needs.plan.outputs.prerelease != 'true'
+    runs-on: windows-latest
+    env:
+      CAN_SUBMIT: ${{ secrets.AZURE_AD_APPLICATION_SECRET != '' }}
+    steps:
+      - name: Without Partner Center credentials
+        if: env.CAN_SUBMIT != 'true'
+        run: echo "::notice::No Partner Center API secrets. Upload the microsoft-store-package artifact in Partner Center (README → Microsoft Store)."
+
+      - uses: actions/download-artifact@v4
+        if: env.CAN_SUBMIT == 'true'
+        with:
+          name: microsoft-store-package
+          path: store
+
+      - uses: microsoft/microsoft-store-apppublisher@v1.4
+        if: env.CAN_SUBMIT == 'true'
+
+      - name: Submit the package
+        if: env.CAN_SUBMIT == 'true'
+        shell: pwsh
+        env:
+          TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          SELLER_ID: ${{ secrets.SELLER_ID }}
+        run: |
+          msstore reconfigure --tenantId $env:TENANT_ID --sellerId $env:SELLER_ID --clientId $env:CLIENT_ID --clientSecret $env:CLIENT_SECRET
+          $appx = Get-ChildItem store -Filter '*-Microsoft-Store.appx' | Select-Object -First 1
+          if (-not $appx) { throw 'no Store package in the artifact' }
+          # The CLI takes .msix files; .appx is the same package format.
+          $msix = Join-Path $env:RUNNER_TEMP ($appx.BaseName + '.msix')
+          Copy-Item $appx.FullName $msix
+          # Creates a submission from the live one with this package and commits it to certification.
+          msstore publish $msix -id 9PPGF42F3MDN
+          if ($LASTEXITCODE) { throw "msstore publish failed ($LASTEXITCODE)" }
+          "Submitted $($appx.Name) to the Microsoft Store; it goes live after certification." >> $env:GITHUB_STEP_SUMMARY

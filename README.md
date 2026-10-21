@@ -57,9 +57,11 @@ The sangat can follow the whole shabad on their phones over the gurdwara Wi-Fi. 
 
 ## Download
 
-Get the installer for your computer from the [Releases page](https://github.com/sethigoldy/Kirtan-saathi/releases). The release notes walk through installing step by step, no command line needed:
+**Windows:** get Kirtan Saathi from the [Microsoft Store](https://apps.microsoft.com/detail/9PPGF42F3MDN). Windows shows no security warning, and the Store keeps it up to date.
 
-- **Windows:** setup wizard, `.exe`.
+The other installers are on the [Releases page](https://github.com/sethigoldy/Kirtan-saathi/releases). The release notes walk through installing step by step, no command line needed:
+
+- **Windows:** setup wizard, `.exe` (Windows asks you to confirm once: *More info → Run anyway*).
 - **macOS:** `.dmg`, one for Apple Silicon and one for Intel.
 - **Linux:** `.deb`.
 
@@ -332,7 +334,19 @@ The Store signs the apps it distributes, so people who install from the Store se
 
 The app is registered in Partner Center as *Kirtan Saathi* (Store ID `9PPGF42F3MDN`, an *MSIX or PWA app*). Its package identity from *Product management → Product identity* is in the `appx` section of `electron-builder.yml`.
 
-For each version:
+Each release submits its package to the Store when the repository has the Partner Center API secrets (job *Submit to the Microsoft Store*); the Store publishes it after certification. To set them up, once the app is live:
+
+1. In Partner Center, open *Account settings → User management → Microsoft Entra applications* and add (or create) an Entra application with the **Manager** role.
+2. Add four repository secrets (*Settings → Secrets and variables → Actions*):
+
+   | Secret | Where to find it |
+   |---|---|
+   | `AZURE_AD_TENANT_ID` | Microsoft Entra admin center → *Overview* → Tenant ID |
+   | `AZURE_AD_APPLICATION_CLIENT_ID` | The Entra application → Application (client) ID |
+   | `AZURE_AD_APPLICATION_SECRET` | The Entra application → *Certificates & secrets* → a new client secret (copy it when created) |
+   | `SELLER_ID` | Partner Center → *Account settings* → Seller ID |
+
+Without the secrets, the job only leaves a note, and you upload the package by hand:
 
 1. Get the package: open the installers run that published the release (*Actions → Installers*) and download its `microsoft-store-package` artifact, `Kirtan-Saathi-<version>-Microsoft-Store.appx`. Every run except pull requests keeps it, so *Run workflow* on `main` also produces one.
 2. In Partner Center, start a submission (the first one, or *Update* on the last) and upload the `.appx` under *Packages*. Each submission needs a higher version than the last.
