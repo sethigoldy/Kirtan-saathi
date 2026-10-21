@@ -20,6 +20,8 @@ import type { DisplayView } from '../main/display-types';
 
 export const REPO = resolve(__dirname, '..', '..');
 export const JAPJI_WAV = join(REPO, 'test', 'fixtures', 'japji-50s.wav');
+/** One shabad, then another (test/fixtures/README.md). */
+export const TWO_SHABADS_WAV = join(REPO, 'test', 'fixtures', 'two-shabads.wav');
 export const OUT = resolve(process.env.E2E_OUT ?? join(REPO, 'e2e-results'));
 /** The version under test (an installed app is built from this checkout). */
 export const VERSION = (JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as { version: string }).version;
@@ -87,12 +89,12 @@ function target(): { exe: string; pre: string[] } {
   return packaged ? { exe: packaged, pre: [] } : { exe: require('electron') as string, pre: [REPO] };
 }
 
-function switches(userData: string): string[] {
+function switches(userData: string, audio: string): string[] {
   const s = [
     `--user-data-dir=${userData}`,
     '--use-fake-device-for-media-stream',
     '--use-fake-ui-for-media-stream',
-    `--use-file-for-fake-audio-capture=${JAPJI_WAV}`,
+    `--use-file-for-fake-audio-capture=${audio}`,
     '--disable-gpu',
   ];
   if (process.platform === 'linux') s.push('--no-sandbox');
@@ -101,13 +103,20 @@ function switches(userData: string): string[] {
 
 let launches = 0;
 
-/** Start the app with a private settings folder and wait until the engine is ready. */
-export async function launch(userData = mkdtempSync(join(tmpdir(), 'kirtan-saathi-e2e-'))): Promise<App> {
+/**
+ * Start the app with a private settings folder and wait until the engine is ready.
+ * `audio` is what the fake microphone plays (looped); `env` adds environment variables.
+ */
+export async function launch(
+  userData = mkdtempSync(join(tmpdir(), 'kirtan-saathi-e2e-')),
+  opts: { audio?: string; env?: Record<string, string> } = {},
+): Promise<App> {
   mkdirSync(OUT, { recursive: true });
   const { exe, pre } = target();
   const stand = await releaseServer();
-  const env = { ...process.env, KIRTAN_SAATHI_UPDATE_URL: `${stand}/releases/latest`, KIRTAN_SAATHI_UPDATE_FEED: `${stand}/feed` } as Record<string, string>;
-  const app = await electron.launch({ executablePath: exe, args: [...pre, ...switches(userData)], cwd: REPO, env, timeout: 120_000 });
+  const env = { ...process.env, KIRTAN_SAATHI_UPDATE_URL: `${stand}/releases/latest`, KIRTAN_SAATHI_UPDATE_FEED: `${stand}/feed`, ...opts.env } as Record<string, string>;
+  const args = [...pre, ...switches(userData, opts.audio ?? JAPJI_WAV)];
+  const app = await electron.launch({ executablePath: exe, args, cwd: REPO, env, timeout: 120_000 });
   const log = createWriteStream(join(OUT, `app-${++launches}.log`));
   app.process().stdout?.pipe(log);
   app.process().stderr?.pipe(log);
@@ -122,7 +131,7 @@ export async function launch(userData = mkdtempSync(join(tmpdir(), 'kirtan-saath
 export function launchSecond(userData: string, timeoutMs = 60_000): Promise<number | null> {
   const { exe, pre } = target();
   return new Promise((done, fail) => {
-    const p = spawn(exe, [...pre, ...switches(userData)], { stdio: 'ignore' });
+    const p = spawn(exe, [...pre, ...switches(userData, JAPJI_WAV)], { stdio: 'ignore' });
     const timer = setTimeout(() => {
       p.kill();
       fail(new Error(`the second copy was still running after ${timeoutMs} ms`));

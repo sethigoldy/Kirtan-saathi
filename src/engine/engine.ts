@@ -94,7 +94,8 @@ export interface EngineOptions {
    * shabad on the same windows. Switch when, over `pairedWindowSec`, a
    * challenger has at least `pairedMinSamples` comparisons, explains the
    * audio better by `pairedMargin` on average, and wins `pairedWinFraction`
-   * of them.
+   * of them. The window stretches with `paceScale` (comparisons come with
+   * the global checks, which the pacer spaces out), so the samples still fit.
    */
   pairedWindowSec: number;
   pairedMinSamples: number;
@@ -108,12 +109,23 @@ export interface EngineOptions {
    * not count towards losing the lock.
    */
   lyricScore: number;
-  // Losing the shabad.
+  // Losing the shabad: at least `lostMinHops` updates within `lostWindowSec`
+  // (stretched with `paceScale`, like the hops) averaging below `lostScore`.
   lostWindowSec: number;
   lostMinHops: number;
   lostScore: number;
   /** Windows with less speech than this (query self-score) do not count. */
   lostMinSelf: number;
+  /**
+   * Stale lock: when, over the last `staleSec`, the locked shabad explained
+   * less than `lostScore` of the voiced audio on average, search again, as
+   * Search again would. Unlike the lost check, this counts windows the global
+   * search cannot place either (a new shabad sung less clearly), so it looks
+   * over a longer stretch than an instrumental break. Not stretched with
+   * `paceScale`: breaks last as long on any computer, and even at 4× the
+   * window holds more than `lostMinHops` updates. 0: off.
+   */
+  staleSec: number;
   /** Multiplies hop lengths; raised by the pacer on slow machines. */
   paceScale: number;
   tracker: Partial<TrackerOptions>;
@@ -162,6 +174,7 @@ export const DEFAULT_ENGINE_OPTIONS: EngineOptions = {
   lostMinHops: 16,
   lostScore: 0.35,
   lostMinSelf: 8,
+  staleSec: 45,
   paceScale: 1,
   tracker: {},
   paathWindowSec: 4,
@@ -193,6 +206,10 @@ export class Engine {
   private tracker: LineTracker | null = null;
   private lastGlobal = -Infinity;
   private recentEmission: { t: number; e: number }[] = [];
+  /** Locked shabad's emission on every voiced window, for the stale-lock check. */
+  private voicedEmission: { t: number; e: number }[] = [];
+  /** When the current shabad was locked (or the stale-lock window last restarted). */
+  private lockedAt = 0;
   private paired = new Map<number, { t: number; d: number; line: number }[]>();
   private lastGlobalTop = 1;
   private manual = false;
@@ -274,6 +291,8 @@ export class Engine {
     if (asr) this.follower.update(this.keySince(asr, this.opts.paathWindowSec));
     this.state = 'locked';
     this.recentEmission = [];
+    this.voicedEmission = [];
+    this.lockedAt = this.now;
     this.paired.clear();
   }
 
@@ -326,6 +345,8 @@ export class Engine {
     if (line !== null) this.tracker.force(line);
     this.state = 'locked';
     this.recentEmission = [];
+    this.voicedEmission = [];
+    this.lockedAt = this.now;
   }
 
   /** Operator: move the display to a line in the locked shabad. */
@@ -375,6 +396,8 @@ export class Engine {
     this.manual = false;
     this.evidence.clear();
     this.recentEmission = [];
+    this.voicedEmission = [];
+    this.lockedAt = this.now;
     this.paired.clear();
     this.state = this.total > 0 ? 'searching' : 'listening';
     this.sinceReset = 0;
@@ -470,6 +493,8 @@ export class Engine {
     this.tracker = new LineTracker(this.corpus, this.retriever, shabad, recent ?? line, this.opts.tracker);
     this.state = 'locked';
     this.recentEmission = [];
+    this.voicedEmission = [];
+    this.lockedAt = this.now;
     this.paired.clear();
     this.lastGlobalTop = 1;
   }
@@ -478,8 +503,9 @@ export class Engine {
   private pairedChallenger(t: number): { shabad: number; line: number; mean: number } | null {
     const o = this.opts;
     let best: { shabad: number; line: number; mean: number } | null = null;
+    const windowSec = o.pairedWindowSec * o.paceScale;
     for (const [shabad, samples] of this.paired) {
-      const recent = samples.filter((x) => t - x.t <= o.pairedWindowSec);
+      const recent = samples.filter((x) => t - x.t <= windowSec);
       if (recent.length === 0) { this.paired.delete(shabad); continue; }
       this.paired.set(shabad, recent);
       if (recent.length < o.pairedMinSamples) continue;
@@ -605,7 +631,10 @@ export class Engine {
     if (whole.querySelf >= o.lostMinSelf && this.lastGlobalTop >= o.lyricScore) {
       this.recentEmission.push({ t, e: whole.score });
     }
-    this.recentEmission = this.recentEmission.filter((x) => t - x.t <= o.lostWindowSec);
+    this.recentEmission = this.recentEmission.filter((x) => t - x.t <= o.lostWindowSec * o.paceScale);
+    const staleSec = o.staleSec;
+    if (whole.querySelf >= o.lostMinSelf) this.voicedEmission.push({ t, e: whole.score });
+    this.voicedEmission = this.voicedEmission.filter((x) => t - x.t <= staleSec);
 
     if (global) {
       this.lastGlobal = t;
@@ -660,7 +689,22 @@ export class Engine {
         this.state = 'searching';
         this.evidence.delete(lost);
         this.recentEmission = [];
+        this.voicedEmission = [];
+        this.lockedAt = this.now;
         reason = 'unlock';
+      }
+    }
+    if (this.tracker && !this.manual && o.staleSec > 0 && t - this.lockedAt >= staleSec && this.voicedEmission.length >= o.lostMinHops) {
+      const mean = this.voicedEmission.reduce((a, x) => a + x.e, 0) / this.voicedEmission.length;
+      if (mean < o.lostScore) {
+        const stale = this.tracker.shabad;
+        this.tracker = null;
+        this.state = 'searching';
+        this.evidence.delete(stale);
+        this.paired.clear();
+        this.recentEmission = [];
+        this.voicedEmission = [];
+        reason = 'unlock-stale';
       }
     }
     return this.event(asr, t, reason, upd.posterior);

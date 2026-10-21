@@ -258,7 +258,7 @@ npm run paath-eval -- val-1090 --dir .bench-data/paath --mode paath
 
 ### App tests (end-to-end)
 
-`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, the Punjabi app, recordings, update notices and self-update downloads, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
+`npm run e2e` launches the app and checks every operator feature: listening, switching inputs, modes, Find, steering, blanking, every *Look* setting, the projector window, the phone and OBS pages, Wi-Fi sharing, the Punjabi app, recordings, update notices and self-update downloads, and settings after a restart. The microphone is Chromium's fake capture device playing `test/fixtures/japji-50s.wav`, so audio takes the real path through the engine. A second set (`shabads.e2e.ts`) plays one shabad and then another (`test/fixtures/two-shabads.wav`) and checks that the new shabad comes on screen by itself, without *Search again*: once at the computer's own pace, and once held at 3× pace (`KIRTAN_SAATHI_MIN_PACE=3`) as on a slow computer. It needs the model (`npm run fetch-assets -- --model-only`) and takes about a minute after the engine loads.
 
 ```bash
 npm run e2e                                              # this checkout
@@ -277,7 +277,7 @@ Update checks and downloads go to a local stand-in for GitHub (`KIRTAN_SAATHI_UP
 | Workflow | When | What |
 |---|---|---|
 | `.github/workflows/ci.yml` | every push and pull request | Build and unit tests, plus a native ONNX Runtime model smoke test on Ubuntu, Windows and macOS. The end-to-end tests on the packaged Windows app |
-| `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
+| `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark and shabad changes, gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
 | `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. The installed Windows app also runs the end-to-end tests. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
 
 ### Darbar Sahib recordings (private)

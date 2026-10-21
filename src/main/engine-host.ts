@@ -9,7 +9,7 @@ import { AsrModel, SAMPLE_RATE } from '../engine/asr';
 import { Corpus } from '../engine/corpus';
 import { Engine, type EngineEvent, type Transcriber } from '../engine/engine';
 import { Retriever } from '../engine/retrieval';
-import { Pacer } from '../engine/pacer';
+import { decodeCostMs, Pacer } from '../engine/pacer';
 import type { FromEngine, ToEngine, UiCandidate, UiShabad } from './protocol';
 import type { DisplayReport } from './display-state';
 
@@ -33,7 +33,8 @@ let retriever: Retriever | null = null;
 let ready: FromEngine | null = null;
 let lastShabad: number | null | undefined;
 let pumping = false;
-const pacer = new Pacer();
+// KIRTAN_SAATHI_MIN_PACE (tests): keep at least this pace scale, as a slow computer would.
+const pacer = new Pacer({ minScale: Number(process.env.KIRTAN_SAATHI_MIN_PACE) || 1 });
 let shabadCache: UiShabad | null = null;
 let lastReport = '';
 
@@ -108,11 +109,13 @@ function candidate(shabad: number, line: number, score: number, evidence: number
 /** Adjust hop lengths so decoding keeps up with real time on this machine. */
 function pace(ev: EngineEvent): void {
   const e = engine!;
+  const o = e.opts;
   if (ev.reason === 'search' || ev.state === 'searching') {
-    e.opts.paceScale = pacer.observe(ev.inferMs, e.opts.searchHopSec);
+    o.paceScale = pacer.observe(decodeCostMs(ev.inferMs, ev.windowSec, o.searchWindowSec), o.searchHopSec);
+  } else if (ev.mode === 'kirtan') {
+    o.paceScale = pacer.observe(decodeCostMs(ev.inferMs, ev.windowSec, o.followWindowSec), o.followHopSec);
   } else {
-    const hop = ev.mode === 'kirtan' ? e.opts.followHopSec : e.opts.paathHopSec;
-    e.opts.paceScale = pacer.observe(ev.inferMs, hop);
+    o.paceScale = pacer.observe(decodeCostMs(ev.inferMs, ev.windowSec, o.paathWindowSec), o.paathHopSec);
   }
 }
 

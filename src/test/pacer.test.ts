@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Pacer, PACE_TIERS } from '../engine/pacer';
+import { decodeCostMs, Pacer, PACE_TIERS } from '../engine/pacer';
 
 test('calibration picks a tier where a decode fits the hop', () => {
   const p = new Pacer();
@@ -27,4 +27,24 @@ test('a single slow decode does not change the tier', () => {
   p.observe(2000, 0.5);
   p.observe(100, 0.5);
   assert.equal(p.scale, 1);
+});
+
+test('the longer global-check decodes do not keep the pacer on a slow tier', () => {
+  const kirtan = (p: Pacer, cost: (ms: number, windowSec: number) => number) => {
+    // Three 5 s follow decodes (300 ms), then a 10 s global check (600 ms).
+    for (let i = 0; i < 40; i++) {
+      const windowSec = i % 4 === 3 ? 10 : 5;
+      p.observe(cost(windowSec === 10 ? 600 : 300, windowSec), 0.5);
+    }
+  };
+  const counted = new Pacer();
+  counted.calibrate(600, 5, 0.5, 5);
+  assert.equal(counted.scale, 2);
+  kirtan(counted, (ms) => ms);
+  assert.equal(counted.scale, 2, 'counted in full, the global checks stop it relaxing');
+  const normalised = new Pacer();
+  normalised.calibrate(600, 5, 0.5, 5);
+  kirtan(normalised, (ms, windowSec) => decodeCostMs(ms, windowSec, 5));
+  assert.equal(normalised.scale, 1.5, 'relaxes to the tier where 300 ms fits');
+  assert.equal(decodeCostMs(80, 3, 5), 80, 'shorter windows count as they are');
 });
