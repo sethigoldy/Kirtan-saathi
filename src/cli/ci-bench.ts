@@ -156,7 +156,7 @@ async function main(): Promise<void> {
     const tmpCache = mkdtempSync(join(tmpdir(), 'ks-private-asr-'));
     let pc = 0, pt = 0, pw = 0, seconds = 0;
     const plocks: number[] = [];
-    const files = readdirSync(join(privDir, 'gt')).filter((x) => x.endsWith('.json')).sort();
+    const files = readdirSync(join(privDir, 'gt')).filter((x) => x.endsWith('.json') && !x.endsWith('.meta.json')).sort();
     for (const f of files) {
       const gt = normalizeGt(corpus, JSON.parse(readFileSync(join(privDir, 'gt', f), 'utf8')) as GtCase);
       const run = await runCase(corpus, retriever, model, gt, f.replace(/\.json$/, ''), join(privDir, 'audio'), tmpCache, {}, false);
