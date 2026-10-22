@@ -162,3 +162,4 @@ jobs:
         with:
           name: benchmark-results
           path: bench-results
+          retention-days: 14
