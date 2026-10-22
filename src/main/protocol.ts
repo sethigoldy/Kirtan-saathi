@@ -42,6 +42,8 @@ export interface UiCandidate {
   page: number;
   score: number;
   evidence: number;
+  /** Found by first letters: the matched words, [first, end) in text split on spaces. */
+  words?: [number, number];
 }
 
 export interface UiEvent {
@@ -76,4 +78,5 @@ export type FromEngine =
   | { type: 'shabad'; shabad: UiShabad | null }
   /** The line on screen after an operator action (Find, a clicked line, Next / Previous), with or without audio. */
   | { type: 'line'; line: number | null; stream: string | null }
-  | { type: 'searchResults'; query: string; results: UiCandidate[] };
+  /** short: the query is too short to search (fewer than 3 first letters, or a few Gurmukhi letters). */
+  | { type: 'searchResults'; query: string; results: UiCandidate[]; short?: boolean };

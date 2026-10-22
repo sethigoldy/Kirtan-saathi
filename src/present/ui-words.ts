@@ -87,7 +87,8 @@ export const PA: Record<string, string> = {
   'Open this address in the phone browser. The phone must be on the same Wi-Fi as this computer.':
     'ਫ਼ੋਨ ਦੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਇਹ ਪਤਾ ਖੋਲ੍ਹੋ। ਫ਼ੋਨ ਇਸ ਕੰਪਿਊਟਰ ਵਾਲੇ Wi-Fi ਉੱਤੇ ਹੀ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।',
   'Find a shabad': 'ਸ਼ਬਦ ਲੱਭੋ',
-  'Type Gurmukhi, e.g. ਪੋਥੀ ਪਰਮੇਸਰ': 'ਗੁਰਮੁਖੀ ਵਿੱਚ ਲਿਖੋ, ਜਿਵੇਂ ਪੋਥੀ ਪਰਮੇਸਰ',
+  'Gurmukhi words or first letters': 'ਗੁਰਮੁਖੀ ਸ਼ਬਦ ਜਾਂ ਪਹਿਲੇ ਅੱਖਰ',
+  'Keep typing…': 'ਹੋਰ ਲਿਖੋ…',
   'Other possible shabads': 'ਹੋਰ ਸੰਭਵ ਸ਼ਬਦ',
   'They appear while listening.': 'ਇਹ ਸੁਣਦੇ ਸਮੇਂ ਦਿਸਦੇ ਹਨ।',
   'None yet.': 'ਅਜੇ ਕੋਈ ਨਹੀਂ।',
@@ -171,6 +172,10 @@ export const HTML: Record<string, Record<UiLanguage, string>> = {
   livestream: {
     en: 'In OBS, add a <em>Browser</em> source with this address, size 1920 × 1080. The background stays transparent.',
     pa: 'OBS ਵਿੱਚ ਇਸ ਪਤੇ ਨਾਲ <em>Browser</em> source ਜੋੜੋ, ਆਕਾਰ 1920 × 1080। ਪਿਛੋਕੜ ਪਾਰਦਰਸ਼ੀ ਰਹਿੰਦਾ ਹੈ।',
+  },
+  'first-letters': {
+    en: 'Type words, e.g. <span lang="pa">ਪੋਥੀ ਪਰਮੇਸਰ</span>, or the first letter of each word: <span lang="pa">ਪਪਕਥ</span>, or <kbd>ppkQ</kbd> with the Gurbani Akhar keys.',
+    pa: 'ਸ਼ਬਦ ਲਿਖੋ, ਜਿਵੇਂ <span lang="pa">ਪੋਥੀ ਪਰਮੇਸਰ</span>, ਜਾਂ ਹਰ ਸ਼ਬਦ ਦਾ ਪਹਿਲਾ ਅੱਖਰ: <span lang="pa">ਪਪਕਥ</span>, ਜਾਂ ਗੁਰਬਾਣੀ ਅੱਖਰ ਕੀਬੋਰਡ ਨਾਲ <kbd>ppkQ</kbd>।',
   },
 };
 
