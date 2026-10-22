@@ -355,7 +355,7 @@ When the key expires, add a new key and update `AZURE_AD_APPLICATION_SECRET`.
 
 Without the secrets, the job only leaves a note, and you upload the package by hand:
 
-1. Get the package: open the installers run that published the release (*Actions → Installers*) and download its `microsoft-store-package` artifact, `Kirtan-Saathi-<version>-Microsoft-Store.appx`. Every run except pull requests keeps it, so *Run workflow* on `main` also produces one.
+1. Get the package: open the installers run that published the release (*Actions → Installers*) and download its `microsoft-store-package` artifact, `Kirtan-Saathi-<version>-Microsoft-Store.appx`. Every run except pull requests keeps it for 30 days, so *Run workflow* on `main` also produces one.
 2. In Partner Center, start a submission (the first one, or *Update* on the last) and upload the `.appx` under *Packages*. Each submission needs a higher version than the last.
 3. The first submission also needs:
    - **Privacy policy URL:** <https://github.com/sethigoldy/Kirtan-saathi/blob/main/PRIVACY.md>

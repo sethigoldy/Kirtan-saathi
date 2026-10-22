@@ -299,6 +299,8 @@ jobs:
           path: release/*-Microsoft-Store.appx
           if-no-files-found: error
           compression-level: 0
+          # Long enough to upload by hand or re-run the Store submission.
+          retention-days: 30
 
       - name: Install and run (macOS)
         if: runner.os == 'macOS'
@@ -346,8 +348,12 @@ jobs:
           name: smoke-${{ matrix.os }}
           path: smoke/
           if-no-files-found: ignore
+          retention-days: 7
 
+      # The release job publishes these; on pull requests they were already
+      # installed and tested above, so they are not kept (about 1.5 GB per run).
       - name: Upload installers
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.os }}
@@ -362,6 +368,7 @@ jobs:
             release/*.blockmap
           if-no-files-found: error
           compression-level: 0
+          retention-days: 14
 
   release:
     name: Publish release

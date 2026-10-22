@@ -145,3 +145,4 @@ jobs:
           name: e2e-windows
           path: e2e-results/
           if-no-files-found: ignore
+          retention-days: 7
