@@ -296,6 +296,7 @@ Update checks and downloads go to a local stand-in for GitHub (`KIRTAN_SAATHI_UP
 | `.github/workflows/ci.yml` | every push and pull request | Build and unit tests, plus a native ONNX Runtime model smoke test on Ubuntu, Windows and macOS. The end-to-end tests on the packaged Windows app |
 | `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark and shabad changes, gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
 | `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. The installed Windows app also runs the end-to-end tests. Its native modules must load with Windows alone: they carry the Visual C++ runtime, which the Visual C++ Redistributable installs but Windows does not include. `scripts/check-windows-dlls.mjs` checks every DLL they import, and the smoke test checks that ONNX Runtime loads the app's own copy. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
+| `.github/workflows/store-access.yml` | manual | Signs in to Partner Center with the Store secrets and reads the app, without changing any submission |
 
 ### Darbar Sahib recordings (private)
 
@@ -334,17 +335,23 @@ The Store signs the apps it distributes, so people who install from the Store se
 
 The app is registered in Partner Center as *Kirtan Saathi* (Store ID `9PPGF42F3MDN`, an *MSIX or PWA app*). Its package identity from *Product management → Product identity* is in the `appx` section of `electron-builder.yml`.
 
-Each release submits its package to the Store when the repository has the Partner Center API secrets (job *Submit to the Microsoft Store*); the Store publishes it after certification. To set them up, once the app is live:
+Each release submits its package to the Store when the repository has the Partner Center API secrets (job *Submit to the Microsoft Store*). The job creates a submission from the live one with the new package and commits it to certification; after certification the Store publishes it and updates installed copies. To set up the secrets:
 
-1. In Partner Center, open *Account settings → User management → Microsoft Entra applications* and add (or create) an Entra application with the **Manager** role.
-2. Add four repository secrets (*Settings → Secrets and variables → Actions*):
+1. In Partner Center, open the gear icon → *Account settings* → *Tenants*. If no tenant is listed, click *Create Microsoft Entra ID*.
+2. Open *User management* → *Microsoft Entra applications* → *Add Microsoft Entra application* → *Create Microsoft Entra application*, and give it the **Manager** role.
+3. Open the application, copy its Tenant ID and Client ID, then click *Add new key* and copy the key. Partner Center shows the key only once, and lists when it expires.
+4. Add four repository secrets (*Settings → Secrets and variables → Actions*):
 
-   | Secret | Where to find it |
+   | Secret | Value |
    |---|---|
-   | `AZURE_AD_TENANT_ID` | Microsoft Entra admin center → *Overview* → Tenant ID |
-   | `AZURE_AD_APPLICATION_CLIENT_ID` | The Entra application → Application (client) ID |
-   | `AZURE_AD_APPLICATION_SECRET` | The Entra application → *Certificates & secrets* → a new client secret (copy it when created) |
+   | `AZURE_AD_TENANT_ID` | Tenant ID |
+   | `AZURE_AD_APPLICATION_CLIENT_ID` | Client ID |
+   | `AZURE_AD_APPLICATION_SECRET` | The key |
    | `SELLER_ID` | Partner Center → *Account settings* → Seller ID |
+
+5. Run *Actions → Microsoft Store access → Run workflow* (`.github/workflows/store-access.yml`). It signs in and reads the app without changing any submission, and fails with the reason when a secret is wrong.
+
+When the key expires, add a new key and update `AZURE_AD_APPLICATION_SECRET`.
 
 Without the secrets, the job only leaves a note, and you upload the package by hand:
 

@@ -1,0 +1,46 @@
+name: Microsoft Store access
+
+# Checks the Partner Center API secrets that the installers workflow uses to
+# submit each release to the Microsoft Store (job "Submit to the Microsoft
+# Store"): signs in and reads the app and its latest submission, without
+# creating or changing a submission. Run it after adding or renewing the
+# secrets: Actions → Microsoft Store access → Run workflow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Read the app from Partner Center
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      STORE_ID: 9PPGF42F3MDN
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: microsoft/microsoft-store-apppublisher@v1.4
+
+      - name: Sign in to Partner Center
+        shell: pwsh
+        env:
+          TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          SELLER_ID: ${{ secrets.SELLER_ID }}
+        run: ./scripts/msstore-sign-in.ps1
+
+      - name: Read the app and its latest submission
+        shell: pwsh
+        run: |
+          $app = (msstore apps get $env:STORE_ID) -join "`n"
+          if ($LASTEXITCODE -or $app -notmatch $env:STORE_ID) {
+            Write-Host $app
+            throw "Partner Center did not return app $env:STORE_ID. Check that the Entra application has the Manager role and that the key and the seller ID belong to this account."
+          }
+          Write-Host $app
+          msstore submission status $env:STORE_ID
+          if ($LASTEXITCODE) { throw "msstore submission status failed ($LASTEXITCODE)" }
+          "Partner Center access works: the next release is submitted to the Store automatically." >> $env:GITHUB_STEP_SUMMARY
