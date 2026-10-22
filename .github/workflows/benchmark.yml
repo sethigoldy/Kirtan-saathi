@@ -104,6 +104,7 @@ jobs:
           shopt -s nullglob
           n=0
           for j in "$RUNNER_TEMP"/data/test/*.json; do
+            case "$j" in *.meta.json) continue ;; esac
             id=$(basename "$j" .json)
             cp "$j" "$RUNNER_TEMP/darbar/gt/"
             ffmpeg -v error -y -i "$RUNNER_TEMP/data/test/$id.opus" -ac 1 -ar 16000 "$RUNNER_TEMP/darbar/audio/${id}_16k.wav"
