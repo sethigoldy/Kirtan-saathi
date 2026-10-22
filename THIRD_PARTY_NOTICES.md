@@ -8,6 +8,7 @@ Kirtan Saathi bundles the following. Each remains under its own licence.
 | Punjabi arth and English translations from the Shabad OS Database | Meanings under the tuk | See the citations below; quoted unaltered with credit on screen |
 | [karansea/indicconformer-stt-pa-ctc-shabad-preview](https://huggingface.co/karansea/indicconformer-stt-pa-ctc-shabad-preview), revision `5fd2e89e` | Speech recognition model | MIT |
 | [ONNX Runtime](https://github.com/microsoft/onnxruntime) 1.23.2 | Model inference | MIT |
+| Microsoft Visual C++ runtime (`msvcp140.dll`, `msvcp140_1.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`), Windows only | Needed by ONNX Runtime | Redistributable under the Microsoft Visual Studio licence terms |
 | [Electron](https://www.electronjs.org/) | Desktop app runtime | MIT |
 | [Noto Sans Gurmukhi](https://fonts.google.com/noto/specimen/Noto+Sans+Gurmukhi), [Noto Sans Devanagari](https://fonts.google.com/noto/specimen/Noto+Sans+Devanagari) | Fonts | SIL Open Font License 1.1 |
 | Khanda icon (`mdi-khanda`), [Material Design Icons](https://pictogrammers.com/library/mdi/icon/khanda/) by Pictogrammers | Watermark in the "Light with Khanda" theme | Apache License 2.0 |

@@ -295,7 +295,7 @@ Update checks and downloads go to a local stand-in for GitHub (`KIRTAN_SAATHI_UP
 |---|---|---|
 | `.github/workflows/ci.yml` | every push and pull request | Build and unit tests, plus a native ONNX Runtime model smoke test on Ubuntu, Windows and macOS. The end-to-end tests on the packaged Windows app |
 | `.github/workflows/benchmark.yml` | merges to `main`, pull requests into `main`, manual | Full kirtan + paath benchmark and shabad changes, gated by `ci/thresholds.json`, deltas against `ci/baseline.json`, Electron app smoke test under Xvfb |
-| `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. The installed Windows app also runs the end-to-end tests. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
+| `.github/workflows/installers.yml` | tags `v*`, pull requests touching packaging, manual | Builds the Windows, macOS (Apple Silicon and Intel) and Linux installers. Each installer is installed on a clean runner of its OS, and the installed app plays `test/fixtures/japji-50s.wav`. The check fails unless a Japji line is on screen. The installed Windows app also runs the end-to-end tests. Its native modules must load with Windows alone: they carry the Visual C++ runtime, which the Visual C++ Redistributable installs but Windows does not include. `scripts/check-windows-dlls.mjs` checks every DLL they import, and the smoke test checks that ONNX Runtime loads the app's own copy. On a tag, publishes a GitHub Release with the install guide (`.github/release-notes.md`) and `SHA256SUMS.txt`. |
 
 ### Darbar Sahib recordings (private)
 
@@ -374,7 +374,7 @@ Without the secrets, the job only leaves a note, and you upload the package by h
 | `src/main/` | Electron main, preload, engine utility process, message protocol, display state, presentation server, projector window, settings, meanings |
 | `src/present/`, `static/present/` | Projector / overlay / phone page, Gurmukhi formatting and Devanagari transliteration |
 | `src/renderer/`, `static/` | Operator window, audio capture worklet, styles |
-| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon (`build/icon.svg`; `npm run icon` renders the PNG, ICO, ICNS and Store tiles), macOS entitlements |
+| `electron-builder.yml`, `build/`, `scripts/after-pack.cjs` | Installer configuration, icon (`build/icon.svg`; `npm run icon` renders the PNG, ICO, ICNS and Store tiles), macOS entitlements. On Windows, `after-pack.cjs` copies the Visual C++ runtime that ONNX Runtime needs from Visual Studio (or `VC_REDIST_DIR`) |
 | `src/cli/` | `bench`, `paath-eval`, `ci-bench`, `run-file`, `calibrate`, `sweep`, `transition`, `soak`, `prefill-cache`, `model-smoke`, `build-corpus`, `build-meanings`, `score`, `caption-label`, `caption-pack`, `caption-eval`, `darbar-batch` |
 | `src/test/` | Unit tests (`npm test`) |
 | `src/e2e/` | End-to-end tests of the running app (`npm run e2e`) |

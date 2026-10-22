@@ -37,7 +37,10 @@ on:
       - build/**
       - scripts/after-pack.cjs
       - scripts/check-smoke.mjs
+      - scripts/check-windows-dlls.mjs
       - scripts/fetch-assets.mjs
+      - scripts/watch-windows-smoke.ps1
+      - scripts/windows-dlls.cjs
       - package.json
       - package-lock.json
       - src/main/**
@@ -186,6 +189,10 @@ jobs:
           npx electron-builder ${{ matrix.target }} --publish never "${extra[@]}"
           ls -la release
 
+      - name: Native modules need only Windows
+        if: runner.os == 'Windows'
+        run: node scripts/check-windows-dlls.mjs release/win-unpacked
+
       # ---- Install the installer and run the installed app ----
 
       - name: Install and run (Windows)
@@ -209,7 +216,7 @@ jobs:
           $env:GURBANI_SMOKE_PROJECTOR = "$PWD\smoke\projector.png"
           $env:GURBANI_SMOKE_REPORT = "$PWD\smoke\report.json"
           $p = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru -RedirectStandardOutput smoke\app.log -RedirectStandardError smoke\app.err
-          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'app did not finish within 3 minutes' }
+          ./scripts/watch-windows-smoke.ps1 -Process $p -AppDir $exe.DirectoryName
           Get-Content smoke\app.log -ErrorAction SilentlyContinue | Select-Object -Last 20
           node scripts/check-smoke.mjs smoke/report.json smoke/operator.png smoke/projector.png
 
@@ -269,7 +276,7 @@ jobs:
           $env:GURBANI_SMOKE_PROJECTOR = "$PWD\smoke\store\projector.png"
           $env:GURBANI_SMOKE_REPORT = "$PWD\smoke\store\report.json"
           $p = Start-Process -FilePath $exe -ArgumentList '--disable-gpu' -PassThru -RedirectStandardOutput smoke\store\app.log -RedirectStandardError smoke\store\app.err
-          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'app did not finish within 3 minutes' }
+          ./scripts/watch-windows-smoke.ps1 -Process $p -AppDir $pkg.InstallLocation
           Get-Content smoke\store\app.log -ErrorAction SilentlyContinue | Select-Object -Last 20
           node scripts/check-smoke.mjs smoke/store/report.json smoke/store/operator.png smoke/store/projector.png
 
