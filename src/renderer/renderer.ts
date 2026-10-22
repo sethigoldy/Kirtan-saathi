@@ -188,11 +188,24 @@ function renderCandidates(el: HTMLOListElement, items: UiCandidate[], emptyText:
     const li = document.createElement('li');
     const text = document.createElement('div');
     text.className = 'text';
-    text.textContent = c.text;
+    if (c.words) {
+      // Found by first letters: the matched words in bold.
+      const [from, to] = c.words;
+      c.text.trim().split(/\s+/).forEach((word, i) => {
+        if (i) text.append(' ');
+        if (i < from || i >= to) return void text.append(word);
+        const b = document.createElement('b');
+        b.textContent = word;
+        text.append(b);
+      });
+    } else {
+      text.textContent = c.text;
+    }
     const row = document.createElement('div');
     row.className = 'row';
     const info = document.createElement('span');
-    info.textContent = t('{0} ({1}% match)', [sourceName(c.source, c.sourcePa), pageLabel(c.source, c.page)].filter(Boolean).join(', '), (c.score * 100).toFixed(0));
+    const place = [sourceName(c.source, c.sourcePa), pageLabel(c.source, c.page)].filter(Boolean).join(', ');
+    info.textContent = c.words ? place : t('{0} ({1}% match)', place, (c.score * 100).toFixed(0));
     const btn = document.createElement('button');
     btn.textContent = t('Show this');
     btn.title = t('Show this shabad and keep it until Search again');
@@ -291,7 +304,9 @@ function onEngine(msg: FromEngine): void {
       highlight();
       break;
     case 'searchResults':
-      renderCandidates($<HTMLOListElement>('results'), msg.results, 'No match');
+      // Typing goes on while a search runs: show only the latest query's results.
+      if (msg.query !== $<HTMLInputElement>('search').value.trim()) break;
+      renderCandidates($<HTMLOListElement>('results'), msg.results, msg.short ? 'Keep typing…' : 'No match');
       break;
   }
 }
@@ -527,10 +542,23 @@ for (const t of Array.from(document.querySelectorAll<HTMLButtonElement>('.tabs [
   });
 }
 
+/** Search as the operator types (after a short pause), and at once on Enter. */
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+function search(): void {
+  clearTimeout(searchTimer);
+  const q = $<HTMLInputElement>('search').value.trim();
+  const el = $<HTMLOListElement>('results');
+  if (q) return send({ type: 'search', query: q });
+  lists.delete(el);
+  el.textContent = '';
+}
+$('search').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(search, 250);
+});
 $('search-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  const q = $<HTMLInputElement>('search').value.trim();
-  if (q) send({ type: 'search', query: q });
+  search();
 });
 
 // ---------- Presentation: projector, overlay, phones ----------

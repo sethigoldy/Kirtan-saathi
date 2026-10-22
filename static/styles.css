@@ -298,6 +298,9 @@ input[type='range'] { padding: 0; border: 0; background: transparent; accent-col
 .candidates li { padding: 10px 12px; background: var(--surmai); border: 1px solid var(--line); border-radius: var(--r-md); }
 .candidates li.empty { color: var(--muted); background: transparent; border-style: dashed; }
 .candidates .text { font-family: var(--gurmukhi); font-size: 16px; line-height: 1.5; }
+/* Found by first letters: the matched words stand out. */
+.candidates .text:has(b) { color: var(--faint); }
+.candidates .text b { color: var(--ink); font-weight: 700; }
 .candidates .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 6px; }
 .candidates button { padding: 4px 10px; font-size: 12.5px; }
 
