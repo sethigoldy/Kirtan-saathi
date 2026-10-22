@@ -371,6 +371,16 @@ describe('Kirtan Saathi app', () => {
     await pick('hindi', 'off');
     await until('Gurmukhi only', () => cur.locator('.hi').count(), (n) => n === 0);
 
+    // The tuk in English letters, under the Gurmukhi.
+    await page().click('label:has(#opt-roman)');
+    await until('English letters on', settings, (s) => s.roman);
+    const ro = await until('English letters under the tuk', async () => ((await cur.locator('.ro').textContent()) ?? '').trim(), (t) => t.length > 0);
+    assert.equal(plain((await now()).current?.text), plain(POTHI), 'still the Pothi line');
+    assert.equal(ro, 'pothee paramesar kaa thaan ||');
+    assert.equal(await cur.locator('.gu').count(), 1, 'Gurmukhi stays');
+    await page().click('label:has(#opt-roman)');
+    await until('English letters off', () => cur.locator('.ro').count(), (n) => n === 0);
+
     // Meanings: any of Punjabi, Hindi and English, in that order.
     const meaning = (lang: string) => page().click(`label:has(input[name="meaning"][value="${lang}"])`);
     const shown = () => cur.locator('.arth > div').evaluateAll((d) => d.map((x) => x.className));
@@ -486,6 +496,11 @@ describe('Kirtan Saathi app', () => {
       await phone.click('#script');
       assert.equal((await phone.locator('#script').textContent())?.trim(), 'ਗੁ + हि');
       await until('Hindi on the phone', async () => (await phone.locator('#lines').textContent()) ?? '', (t) => /[\u0900-\u097F]/.test(t));
+      // The reader's own English letters.
+      await phone.click('#roman');
+      assert.equal((await phone.locator('#roman').textContent())?.trim(), 'ABC ✓');
+      await until('English letters on the phone', async () => (await phone.locator('#lines li.current .ro').textContent()) ?? '', (t) => /^[a-z]/.test(t.trim()));
+      assert.equal((await now()).settings.roman, false, "a phone's English letters do not change the projector");
       // The reader's own meaning, even with the projector's meanings off.
       const arth = async () => (await phone.locator('#arth').textContent())?.trim();
       await phone.click('#arth');
@@ -503,6 +518,9 @@ describe('Kirtan Saathi app', () => {
       await phone.goto(`${k.base}/overlay`);
       assert.equal(await phone.locator('html').getAttribute('data-layout'), 'overlay');
       await until('the overlay line', async () => plain(await phone.locator('#current .gu').textContent()), (t) => t.length > 0);
+      assert.equal(await phone.locator('#current .ro').count(), 0, 'no English letters unless asked');
+      await phone.goto(`${k.base}/overlay?roman=1`);
+      await until('English letters on the overlay', async () => ((await phone.locator('#current .ro').textContent()) ?? '').trim(), (t) => /^[a-z]/.test(t));
     } finally {
       await phone.close();
     }

@@ -70,6 +70,7 @@ export const PA: Record<string, string> = {
   'Hindi script': 'ਹਿੰਦੀ ਲਿਪੀ',
   Off: 'ਬੰਦ',
   'Under the tuk': 'ਤੁਕ ਦੇ ਹੇਠਾਂ',
+  'Tuk in English letters': 'ਤੁਕ ਅੰਗਰੇਜ਼ੀ ਅੱਖਰਾਂ ਵਿੱਚ',
   'Hindi only': 'ਸਿਰਫ਼ ਹਿੰਦੀ',
   Meaning: 'ਅਰਥ',
   English: 'ਅੰਗਰੇਜ਼ੀ',
@@ -172,6 +173,10 @@ export const HTML: Record<string, Record<UiLanguage, string>> = {
   livestream: {
     en: 'In OBS, add a <em>Browser</em> source with this address, size 1920 × 1080. The background stays transparent.',
     pa: 'OBS ਵਿੱਚ ਇਸ ਪਤੇ ਨਾਲ <em>Browser</em> source ਜੋੜੋ, ਆਕਾਰ 1920 × 1080। ਪਿਛੋਕੜ ਪਾਰਦਰਸ਼ੀ ਰਹਿੰਦਾ ਹੈ।',
+  },
+  roman: {
+    en: 'For the sangat who do not read Gurmukhi: <span lang="pa">ਪੋਥੀ ਪਰਮੇਸਰ</span> → pothee paramesar',
+    pa: 'ਗੁਰਮੁਖੀ ਨਾ ਪੜ੍ਹ ਸਕਣ ਵਾਲੀ ਸੰਗਤ ਲਈ: <span lang="pa">ਪੋਥੀ ਪਰਮੇਸਰ</span> → pothee paramesar',
   },
   'first-letters': {
     en: 'Type words, e.g. <span lang="pa">ਪੋਥੀ ਪਰਮੇਸਰ</span>, or the first letter of each word: <span lang="pa">ਪਪਕਥ</span>, or <kbd>ppkQ</kbd> with the Gurbani Akhar keys.',

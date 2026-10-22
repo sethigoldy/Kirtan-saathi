@@ -596,6 +596,7 @@ function renderView(v: DisplayView): void {
     refreshWords();
   }
   radio('hindi', st.hindi);
+  $<HTMLInputElement>('opt-roman').checked = st.roman;
   for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="meaning"]'))) {
     el.checked = st.meaning.includes(el.value as MeaningLang);
   }
@@ -689,6 +690,7 @@ $('font-scale').addEventListener('input', (e) => setting({ fontScale: Number((e.
 onRadio('theme', (v) => setting({ theme: v as PresentationSettings['theme'] }));
 onRadio('language', (v) => setting({ language: v as UiLanguage }));
 onRadio('hindi', (v) => setting({ hindi: v as PresentationSettings['hindi'] }));
+$('opt-roman').addEventListener('change', (e) => setting({ roman: (e.target as HTMLInputElement).checked }));
 for (const el of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="meaning"]'))) {
   el.addEventListener('change', () => {
     const on = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="meaning"]:checked'));

@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { DisplayState, type DisplayReport, type DisplayView } from '../main/display-state';
 import { controlAllowed, PresentationServer, type ControlAction } from '../main/server';
 import { parseSettings, SettingsStore } from '../main/settings';
-import { parseMeaning, plainText, toDevanagari, tokens } from '../present/format';
+import { parseMeaning, plainText, toDevanagari, toRoman, tokens } from '../present/format';
 import { Meanings } from '../main/meanings';
 
 const SHABAD = {
@@ -68,6 +68,8 @@ test('display state emits only on real changes and hides next in kirtan', () => 
   assert.equal(s.theme, 'khanda', 'invalid theme falls back to the default');
   assert.equal(s.hindi, 'off');
   assert.deepEqual(s.meaning, []);
+  assert.equal(d.settings.roman, false, 'English letters are off by default');
+  assert.equal(d.updateSettings({ roman: 'yes' as never }).roman, true);
 });
 
 test('Gurmukhi to Devanagari follows Hindi gutka conventions', () => {
@@ -78,6 +80,19 @@ test('Gurmukhi to Devanagari follows Hindi gutka conventions', () => {
   assert.equal(toDevanagari('ੴ'), 'ੴ');
   const hi = tokens('ਗੁਰਿ ਪੂਰੈ; ਕਿਰਪਾ ਧਾਰੀ ॥', { larivaar: false, vishraam: true, hindi: true });
   assert.deepEqual(hi.map((t) => [t.text, t.pause]), [['गुरि', null], ['पूरै', 'main'], ['किरपा', null], ['धारी', null], ['॥', null]]);
+});
+
+test('Gurmukhi to English letters reads as on SikhiToTheMax screens', () => {
+  assert.equal(toRoman('ੴ ਸਤਿ ਨਾਮੁ ਕਰਤਾ ਪੁਰਖੁ ਨਿਰਭਉ ਨਿਰਵੈਰੁ'), 'ik oankaar sat naam karataa purakh nirabhau niravair');
+  assert.equal(toRoman('ਪੋਥੀ ਪਰਮੇਸਰ ਕਾ ਥਾਨੁ ॥'), 'pothee paramesar kaa thaan ||');
+  assert.equal(toRoman('ਵਾਹਿਗੁਰੂ ਸਾਹਿਬੁ ਹਉਮੈ ਮਿਲੈ'), 'vaahiguroo saahib haumai milai', 'long and joined vowels');
+  assert.equal(toRoman('ਹਰਿ ਗੁਰਿ ਕਿ ਸੁ ਨ ਮਨ'), 'har gur ki su na man', 'a final ਿ / ੁ and the last inherent a are silent unless the word has no other vowel');
+  assert.equal(toRoman('ਗਇਆ ਜੀਉ ਉਪਜੈ ਆਪੇ ਇਕ ਓਅੰਕਾਰਿ'), 'gaiaa jeeu upajai aape ik oankaar', 'independent vowels and carriers');
+  assert.equal(toRoman('ਅੰਮ੍ਰਿਤ ਪ੍ਰਭ ਸੰਤ ਅੰਬਰ ਮਾਂ ਤੁਮ੍ਹ'), 'amrit prabh sant ambar maan tumh', 'subjoined letters and nasals');
+  assert.equal(toRoman('ਸੱਚ ਅੱਖਰ ਸ਼ਬਦ ਨਮਃ'), 'sacch akkhar shabad namah', 'addak, nukta, visarga');
+  assert.equal(toRoman('ਸਚੁ॥੧॥ ਰਹਾਉ ॥'), 'sach||1|| rahaau ||', 'dandas and digits');
+  const ro = tokens('ਗੁਰਿ ਪੂਰੈ; ਕਿਰਪਾ ਧਾਰੀ ॥੧॥', { larivaar: true, vishraam: true, roman: true });
+  assert.deepEqual(ro.map((t) => [t.gap + t.text, t.pause, t.mark]), [['gur', null, false], [' poorai', 'main', false], [' kirapaa', null, false], [' dhaaree', null, false], [' ||1||', null, true]], 'English letters keep their spaces in larivaar');
 });
 
 test('meanings attach to every line only when switched on, with a credit per language', () => {
