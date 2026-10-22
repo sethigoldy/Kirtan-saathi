@@ -21,6 +21,8 @@ export interface PresentationSettings {
   fontScale: number;
   /** Devanagari (Hindi script) transliteration: under the Gurmukhi, or instead of it. */
   hindi: 'off' | 'below' | 'only';
+  /** English transliteration (the tuk in English letters) under the tuk. */
+  roman: boolean;
   /**
    * Meanings under the tuk, in this order (empty = off): Punjabi arth, Hindi
    * (a Hindi translation when one is bundled, otherwise the Punjabi arth in
@@ -41,6 +43,7 @@ export const DEFAULT_SETTINGS: PresentationSettings = {
   waheguru: true,
   fontScale: 1,
   hindi: 'off',
+  roman: false,
   meaning: [],
   theme: 'khanda',
   language: 'en',

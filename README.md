@@ -35,6 +35,7 @@ In paath mode the app follows the reading line by line, across shabads, and prev
 The default theme is *Light with Khanda*. Optional extras under the tuk:
 
 - **Hindi script:** the tuk in Devanagari.
+- **English letters:** the tuk transliterated for the sangat who do not read Gurmukhi (*pothee paramesar kaa thaan*).
 - **Meaning:** Punjabi arth (in Gurmukhi and/or Hindi script) and the English translation, in any combination.
 
 The source line shows the scripture, raag, ang and whose arth is shown, but not the author's name. Vishraam points are coloured.
@@ -51,7 +52,7 @@ The overlay is a transparent lower third for OBS. Add it as a *Browser* source; 
 
 ### Phones
 
-The sangat can follow the whole shabad on their phones over the gurdwara Wi-Fi. The live line is highlighted. Each reader picks Gurmukhi or Hindi script, meanings and text size on their own phone.
+The sangat can follow the whole shabad on their phones over the gurdwara Wi-Fi. The live line is highlighted. Each reader picks Gurmukhi or Hindi script, English letters, meanings and text size on their own phone.
 
 <img src="docs/screenshots/phone-follow.png" alt="Phone follow-along page with the whole shabad, Hindi script and meanings, current line highlighted" width="320" />
 
@@ -197,8 +198,8 @@ All outputs render the same display state, so they always show the same line. A 
 | Output | How | Notes |
 |---|---|---|
 | **Projector** | **Projector → Show** | Fullscreen on the chosen screen. The app remembers the screen. If that screen is unplugged, the projector closes rather than covering the operator's screen, and it reopens when the screen returns. The display is kept awake. **Esc** closes it. |
-| **OBS overlay** | Browser source, `/overlay`, 1920 × 1080 | Transparent lower third. Query options: `size`, `position=top\|center\|bottom`, `box=0`, `next=0\|1`, `source=0\|1`, `waheguru=0\|1`, `color=ffffff`, `hindi=off\|below\|only`, `meaning=off` or a list of `pa`, `hi`, `en` (e.g. `meaning=pa,en`) |
-| **Phones** | Tick *Let phones on this Wi-Fi follow along* | `/follow` shows the whole shabad with the live line highlighted. Readers set text size, script and meaning on their own phone. |
+| **OBS overlay** | Browser source, `/overlay`, 1920 × 1080 | Transparent lower third. Query options: `size`, `position=top\|center\|bottom`, `box=0`, `next=0\|1`, `source=0\|1`, `waheguru=0\|1`, `color=ffffff`, `hindi=off\|below\|only`, `roman=1`, `meaning=off` or a list of `pa`, `hi`, `en` (e.g. `meaning=pa,en`) |
+| **Phones** | Tick *Let phones on this Wi-Fi follow along* | `/follow` shows the whole shabad with the live line highlighted. Readers set text size, script, English letters (**ABC**) and meaning on their own phone. |
 
 The operator window shows a live preview of the projector. Controls:
 
@@ -213,12 +214,18 @@ Presentation settings live under *Projector*:
 - **Next line** and **source line.**
 - **ਵਾਹਿਗੁਰੂ while searching** (on by default): the projector and overlay show ਵਾਹਿਗੁਰੂ until the first line is found, after **Search again**, and when the mode changes. **Blank** still blanks every output.
 - **Hindi (Devanagari):** off, under the Gurmukhi, or instead of it.
+- **Tuk in English letters:** the transliteration under the tuk (and the next line).
 - **Meaning:** any of Punjabi arth, the arth in Hindi script, and the English translation, shown smaller under the tuk in that order.
 
 Notes on the text shown:
 
 - **No author name.** The source line shows the scripture, raag and page only.
 - **Hindi script.** The tuk is transliterated in code using Hindi gutka conventions (addak doubles the consonant; tippi and bindi become anusvara).
+- **English letters.** Also transliterated in code (`toRoman` in `src/present/format.ts`), in the style of SikhiToTheMax screens:
+  - Long vowels are doubled (ਾ *aa*, ੀ *ee*, ੂ *oo*), and every consonant without a vowel sign carries an *a* except at the end of a word (*karataa*, *sach*).
+  - A word's final ਿ or ੁ is silent (*sat naam*, *har*) unless the word has no other vowel (*ki*, *su*).
+  - Tippi and bindi are *n*, or *m* before ਬ ਭ ਪ ਫ (*amrit*, *ambar*). ੴ is *ik oankaar*; ॥ is *||*.
+  - Larivaar applies only to the Gurmukhi and Hindi lines.
 - **Meanings.** Punjabi arth comes from the Shabad OS Database: Prof. Sahib Singh for Sri Guru Granth Sahib, Dr. Ratan Singh Jaggi for Dasam Granth, Bhai Vir Singh for Vaaran, and others. It covers 99% of lines.
 - **English.** Also from the Shabad OS Database: Dr. Sant Singh Khalsa for Sri Guru Granth Sahib, Dr. Surinder Singh Kohli for Dasam Granth (about half of its lines), Jodh Singh for Vaaran, and others. Each source is credited on screen, e.g. *Arth: Prof. Sahib Singh · Translation: Dr. Sant Singh Khalsa*.
 - **"Hindi" meaning.** This is the Punjabi arth written in Devanagari, not a Hindi translation. See *Known limitations*.

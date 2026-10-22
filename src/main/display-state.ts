@@ -114,6 +114,7 @@ function sanitize(s: PresentationSettings): PresentationSettings {
     waheguru: !!s.waheguru,
     fontScale: Math.min(2.5, Math.max(0.5, Number(s.fontScale) || 1)),
     hindi: s.hindi === 'below' || s.hindi === 'only' ? s.hindi : 'off',
+    roman: !!s.roman,
     meaning: parseMeaning(s.meaning),
     theme: s.theme === 'dark' || s.theme === 'light' || s.theme === 'saffron' ? s.theme : 'khanda',
     language: s.language === 'pa' ? 'pa' : 'en',

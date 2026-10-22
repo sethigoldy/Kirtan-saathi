@@ -110,6 +110,8 @@ button { font: inherit; }
    and weight as the Gurmukhi. Only the meaning (arth) below is smaller. */
 .hi { font-family: var(--devanagari); color: var(--hindi); margin-top: 0.2em; line-height: 1.4; }
 .hi.solo { color: inherit; margin-top: 0; }
+/* English letters: smaller than the Gurmukhi, in the Hindi line's colour. */
+.ro { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 0.62em; font-weight: 500; color: var(--hindi); margin-top: 0.3em; line-height: 1.35; }
 
 /* Meaning (arth) under the tuk: smaller, regular weight */
 .arth { font-size: 0.5em; font-weight: 400; color: var(--next); margin-top: 0.45em; line-height: 1.45; }
@@ -176,7 +178,8 @@ button { font: inherit; }
 }
 .source:empty { display: none; }
 :root.blank .stage { opacity: 0; }
-:root[data-layout='overlay'] .hi { color: var(--overlay-fg); opacity: 0.9; }
+:root[data-layout='overlay'] .hi,
+:root[data-layout='overlay'] .ro { color: var(--overlay-fg); opacity: 0.9; }
 .stage.empty .box { opacity: 0; }
 
 /* ---------- OBS overlay (transparent page, lower third) ---------- */

@@ -8,7 +8,8 @@
  *
  * Overlay query parameters: size (multiplier), position (bottom|top|center),
  * box (1|0), next (1|0), source (1|0), color (hex without #),
- * hindi (off|below|only), meaning (off, or any of pa, hi, en as a comma list, e.g. pa,en).
+ * hindi (off|below|only), roman (1|0: the tuk in English letters),
+ * meaning (off, or any of pa, hi, en as a comma list, e.g. pa,en).
  */
 import type { DisplayLine, DisplayView, MeaningLang } from '../main/display-types';
 import { creditText, parseMeaning, toDevanagari, tokens, type UiLanguage } from './format.js';
@@ -57,8 +58,9 @@ if (layout === 'overlay') {
 let view: DisplayView | null = null;
 let lastFollowShabad = '';
 let userScrolledAt = 0;
-/** Follow page: the reader's own Hindi choice (null = use the operator's). */
+/** Follow page: the reader's own Hindi and English-letters choices (null = use the operator's). */
 let localHindi: Hindi | null = null;
+let localRoman: boolean | null = null;
 let localMeaning: MeaningLang[] | null = null;
 
 function meaningMode(v: DisplayView): MeaningLang[] {
@@ -75,9 +77,16 @@ function hindiMode(v: DisplayView): Hindi {
   return v.settings.hindi;
 }
 
-function appendTokens(el: HTMLElement, text: string, hindi: boolean): void {
+function romanMode(v: DisplayView): boolean {
+  const q = flag('roman');
+  if (q !== null) return q;
+  if (layout === 'follow' && localRoman !== null) return localRoman;
+  return v.settings.roman;
+}
+
+function appendTokens(el: HTMLElement, text: string, script: { hindi?: boolean; roman?: boolean }): void {
   const s = view!.settings;
-  for (const t of tokens(text, { larivaar: s.larivaar, vishraam: s.vishraam, hindi })) {
+  for (const t of tokens(text, { larivaar: s.larivaar, vishraam: s.vishraam, ...script })) {
     if (t.gap) el.append(t.gap);
     const span = document.createElement('span');
     span.textContent = t.text;
@@ -88,13 +97,13 @@ function appendTokens(el: HTMLElement, text: string, hindi: boolean): void {
 }
 
 /**
- * Render a line into `el`: Gurmukhi and / or Hindi (Devanagari), with
- * vishraam colouring and larivaar per settings.
+ * Render a line into `el`: Gurmukhi and / or Hindi (Devanagari), optionally
+ * English letters, with vishraam colouring and larivaar per settings.
  */
-function renderLine(el: HTMLElement, line: DisplayLine | null, hindi: Hindi, meaning: MeaningLang[] = []): void {
+function renderLine(el: HTMLElement, line: DisplayLine | null, hindi: Hindi, roman: boolean, meaning: MeaningLang[] = []): void {
   el.textContent = '';
   if (!line || !view) return;
-  renderTuk(el, line, hindi);
+  renderTuk(el, line, hindi, roman);
   // Meanings just under the tuk, smaller: Punjabi arth, Hindi, English.
   const arth = document.createElement('div');
   arth.className = 'arth';
@@ -112,20 +121,27 @@ function renderLine(el: HTMLElement, line: DisplayLine | null, hindi: Hindi, mea
   if (arth.childElementCount) el.append(arth);
 }
 
-function renderTuk(el: HTMLElement, line: DisplayLine, hindi: Hindi): void {
+function renderTuk(el: HTMLElement, line: DisplayLine, hindi: Hindi, roman: boolean): void {
   if (hindi !== 'only') {
     const gu = document.createElement('div');
     gu.className = 'gu';
     gu.lang = 'pa';
-    appendTokens(gu, line.text, false);
+    appendTokens(gu, line.text, {});
     el.append(gu);
   }
   if (hindi !== 'off') {
     const hi = document.createElement('div');
     hi.className = hindi === 'only' ? 'hi solo' : 'hi';
     hi.lang = 'hi';
-    appendTokens(hi, line.text, true);
+    appendTokens(hi, line.text, { hindi: true });
     el.append(hi);
+  }
+  if (roman) {
+    const ro = document.createElement('div');
+    ro.className = 'ro';
+    ro.lang = 'pa-Latn';
+    appendTokens(ro, line.text, { roman: true });
+    el.append(ro);
   }
 }
 
@@ -156,6 +172,7 @@ function renderStage(v: DisplayView): void {
   const next = $('next');
   const src = $('source');
   const hindi = hindiMode(v);
+  const roman = romanMode(v);
   const changed = cur.dataset.line !== String(v.current?.line ?? '');
   cur.dataset.line = String(v.current?.line ?? '');
   const idle = !v.current && (flag('waheguru') ?? v.settings.waheguru);
@@ -167,11 +184,11 @@ function renderStage(v: DisplayView): void {
     gu.textContent = WAHEGURU;
     cur.append(gu);
   } else {
-    renderLine(cur, v.current, hindi, meaningMode(v));
+    renderLine(cur, v.current, hindi, roman, meaningMode(v));
   }
   cur.classList.toggle('waheguru', idle);
   cur.classList.toggle('rahao', v.current?.role === ROLE_RAHAO);
-  renderLine(next, showNext(v) ? v.next : null, hindi);
+  renderLine(next, showNext(v) ? v.next : null, hindi, roman);
   src.textContent = showSource(v) && !idle ? [v.source, creditText(v.credits, meaningMode(v), v.settings.language)].filter(Boolean).join(' · ') : '';
   stage.classList.toggle('empty', !v.current && !idle);
   if (layout === 'projector') {
@@ -191,8 +208,9 @@ function renderStage(v: DisplayView): void {
 function renderFollow(v: DisplayView): void {
   const list = $('lines');
   const hindi = hindiMode(v);
+  const roman = romanMode(v);
   const meaning = meaningMode(v);
-  const key = `${v.lines[0]?.line ?? ''}|${v.settings.larivaar}|${v.settings.vishraam}|${hindi}|${meaning.join(',')}|${v.lines[0]?.pa !== undefined}`;
+  const key = `${v.lines[0]?.line ?? ''}|${v.settings.larivaar}|${v.settings.vishraam}|${hindi}|${roman}|${meaning.join(',')}|${v.lines[0]?.pa !== undefined}`;
   if (key !== lastFollowShabad) {
     lastFollowShabad = key;
     list.textContent = '';
@@ -201,7 +219,7 @@ function renderFollow(v: DisplayView): void {
       li.dataset.line = String(l.line);
       if (l.role === ROLE_HEADER || l.role === ROLE_MANGAL) li.classList.add('header');
       if (l.role === ROLE_RAHAO) li.classList.add('rahao');
-      renderLine(li, l, hindi, meaning);
+      renderLine(li, l, hindi, roman, meaning);
       list.append(li);
     }
     window.scrollTo({ top: 0 });
@@ -295,6 +313,29 @@ if (layout === 'follow') {
     if (view) renderFollow(view);
     label();
   });
+  // English letters: each reader can turn them on or off on their phone.
+  const romanKey = 'ks-follow-roman';
+  try {
+    const saved = localStorage.getItem(romanKey);
+    if (saved === '1' || saved === '0') localRoman = saved === '1';
+  } catch {
+    /* storage unavailable */
+  }
+  const romanLabel = () => {
+    const on = view ? romanMode(view) : !!localRoman;
+    $('roman').textContent = on ? 'ABC ✓' : 'ABC';
+    $('roman').setAttribute('aria-pressed', String(on));
+  };
+  $('roman').addEventListener('click', () => {
+    localRoman = !(view ? romanMode(view) : !!localRoman);
+    try {
+      localStorage.setItem(romanKey, localRoman ? '1' : '0');
+    } catch {
+      /* not persisted */
+    }
+    if (view) renderFollow(view);
+    romanLabel();
+  });
   // Meaning: each reader can choose off, Punjabi, Hindi, English, or two of them.
   const meaningKey = 'ks-follow-meaning';
   try {
@@ -322,6 +363,7 @@ if (layout === 'follow') {
   });
   window.addEventListener('ks-view', () => {
     label();
+    romanLabel();
     meaningLabel();
   });
   $('live').addEventListener('click', () => {
