@@ -8,6 +8,8 @@ import { join } from 'node:path';
 import { AsrModel, SAMPLE_RATE } from '../engine/asr';
 import { Corpus } from '../engine/corpus';
 import { Engine, type EngineEvent, type Transcriber } from '../engine/engine';
+import { FirstLetterIndex, queryLetters } from '../engine/first-letters';
+import { toKey } from '../engine/gurmukhi';
 import { Retriever } from '../engine/retrieval';
 import { decodeCostMs, Pacer } from '../engine/pacer';
 import type { FromEngine, ToEngine, UiCandidate, UiShabad } from './protocol';
@@ -30,6 +32,8 @@ let port: MessagePortLike | null = null;
 let engine: Engine | null = null;
 let corpus: Corpus | null = null;
 let retriever: Retriever | null = null;
+/** Built on the first first-letter search (about 60 ms). */
+let letterIndex: FirstLetterIndex | null = null;
 let ready: FromEngine | null = null;
 let lastShabad: number | null | undefined;
 let pumping = false;
@@ -190,8 +194,24 @@ function handle(msg: ToEngine | null): void {
       send({ type: 'shabad', shabad: null });
       break;
     case 'search': {
-      // Manual search: the operator types romanized or Gurmukhi text.
-      const res = retriever!.search(require('../engine/gurmukhi').toKey(msg.query));
+      // Manual search: first letters (ਪਪਕਥ or the Gurbani Akhar keys ppkQ), or Gurmukhi words.
+      const letters = queryLetters(msg.query);
+      if (letters !== null) {
+        if (letters.length < 3) {
+          send({ type: 'searchResults', query: msg.query, results: [], short: true });
+          return;
+        }
+        letterIndex ??= new FirstLetterIndex(corpus!);
+        const hits = letterIndex.search(letters, 8);
+        send({ type: 'searchResults', query: msg.query, results: hits.map((h) => ({ ...candidate(h.shabad, h.line, 1, 0), words: h.words })) });
+        return;
+      }
+      const key = toKey(msg.query);
+      if (key.length > 0 && key.length < 6) {
+        send({ type: 'searchResults', query: msg.query, results: [], short: true });
+        return;
+      }
+      const res = retriever!.search(key);
       send({
         type: 'searchResults',
         query: msg.query,

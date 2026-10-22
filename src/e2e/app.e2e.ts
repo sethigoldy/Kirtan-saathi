@@ -267,6 +267,22 @@ describe('Kirtan Saathi app', () => {
     await until('the preview to show it', async () => plain(await preview().locator('#current .gu').textContent()), (t) => t === plain(POTHI));
   });
 
+  check('finds a shabad by first letters as the operator types', async () => {
+    const results = () => page().$$eval('#results li', (l) => l.map((x) => x.textContent ?? ''));
+    // No Enter: the results come as the operator types.
+    await page().fill('#search', 'pp');
+    await until('the hint to keep typing', results, (r) => r.length === 1 && r[0] === 'Keep typing…');
+    for (const q of ['ppkQ', 'ਪਪਕਥ']) {
+      await page().fill('#search', q);
+      const r = await until(`the results for ${q}`, results, (r) => plain(r[0]).startsWith(plain(POTHI)));
+      assert.doesNotMatch(r[0], /% match/, 'no match percentage for first letters');
+      const bold = await page().$$eval('#results li:first-child .text b', (b) => b.map((x) => x.textContent));
+      assert.deepEqual(bold, ['ਪੋਥੀ', 'ਪਰਮੇਸਰ', 'ਕਾ', 'ਥਾਨੁ'], 'the matched words in bold');
+    }
+    await page().fill('#search', '');
+    await until('the results cleared', results, (r) => r.length === 0);
+  });
+
   check('lists the shabad chosen in Find in the operator window and follows Next and clicks', async () => {
     const v = await now();
     const chosen = v.current!.line;

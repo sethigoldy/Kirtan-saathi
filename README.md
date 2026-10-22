@@ -166,7 +166,9 @@ npm run run-file -- path/to/nitnem.mp3 --mode bani:JAPJ
 - **Pinning a shabad.** **Show this** on a shabad under *Find* pins it (or the position, in paath). Automatic switching pauses until **Search again**.
 - **Clicking a line** moves the display there; following continues from that line.
 - **Next line.** In paath and bani modes the next line is previewed under the current one.
-- **Find a shabad** (the *Find* tab) searches typed Gurmukhi text.
+- **Find a shabad** (the *Find* tab) searches as you type, in two ways:
+  - **Words:** Gurmukhi text, e.g. *ਪੋਥੀ ਪਰਮੇਸਰ*.
+  - **First letters:** the first letter of each word, in Gurmukhi (*ਪਪਕਥ*) or with the Gurbani Akhar keyboard keys that SikhiToTheMax uses (`ppkQ`). Lines that start with the letters come first, one per shabad, with the matched words in bold. Similar letters count as the same (ਣ and ਨ, ਸ and ਸ਼), and a word starting with a vowel starts with its carrier (ੳ, ਅ, ੲ).
 
 ### Punjabi app
 
@@ -373,6 +375,7 @@ Without the secrets, the job only leaves a note, and you upload the package by h
 | `src/engine/ngram-index.ts` | IDF-weighted n-gram inverted index |
 | `src/engine/align.ts` | Substitution table, Smith-Waterman, repeat-tolerant alignment with end scores |
 | `src/engine/retrieval.ts` | Whole-corpus search, per-shabad and per-line scoring |
+| `src/engine/first-letters.ts` | First-letter search (*Find*) |
 | `src/engine/tracker.ts` | Kirtan HMM line tracker |
 | `src/engine/paath.ts` | Paath / bani follower, source and bani streams |
 | `src/engine/engine.ts` | Modes and the search / lock / follow / switch / unlock state machine |
@@ -409,7 +412,7 @@ The model download is pinned to a Hugging Face revision and checked against a SH
 ## Known limitations
 
 - **No katha mode yet.** Katha speech may briefly lock onto a shabad.
-- **Gurmukhi-only text search.** The operator search takes Gurmukhi text; first-letter search is not implemented.
+- **No romanized word search.** *Find* takes Gurmukhi words or first letters, not words typed in Roman script (*pothi*).
 - **No Hindi translation yet.** The *Hindi* meaning shows the Punjabi arth in Devanagari. Real Hindi translations exist in BaniDB, but BaniDB's data is not openly licensed. Bundling it needs permission from the Khalis Foundation; the display already supports it (`DisplayLine.hi`).
 - **Unsigned installers.** Users confirm once (*Run anyway* / *Open Anyway*) until signing secrets are added. On Windows, the Microsoft Store version avoids this (see *Microsoft Store*).
 - **Limited evaluation coverage.** Dasam Granth, Vaaran and Bhai Nand Lal are searchable but have no evaluation audio. The kirtan set is small.
