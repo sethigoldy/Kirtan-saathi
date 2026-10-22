@@ -428,6 +428,10 @@ jobs:
         if: env.CAN_SUBMIT != 'true'
         run: echo "::notice::No Partner Center API secrets. Upload the microsoft-store-package artifact in Partner Center (README → Microsoft Store)."
 
+      # Before the download: checkout empties the workspace.
+      - uses: actions/checkout@v4
+        if: env.CAN_SUBMIT == 'true'
+
       - uses: actions/download-artifact@v4
         if: env.CAN_SUBMIT == 'true'
         with:
@@ -437,7 +441,7 @@ jobs:
       - uses: microsoft/microsoft-store-apppublisher@v1.4
         if: env.CAN_SUBMIT == 'true'
 
-      - name: Submit the package
+      - name: Sign in to Partner Center
         if: env.CAN_SUBMIT == 'true'
         shell: pwsh
         env:
@@ -445,14 +449,19 @@ jobs:
           CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
           SELLER_ID: ${{ secrets.SELLER_ID }}
+        run: ./scripts/msstore-sign-in.ps1
+
+      - name: Submit the package
+        if: env.CAN_SUBMIT == 'true'
+        shell: pwsh
         run: |
-          msstore reconfigure --tenantId $env:TENANT_ID --sellerId $env:SELLER_ID --clientId $env:CLIENT_ID --clientSecret $env:CLIENT_SECRET
           $appx = Get-ChildItem store -Filter '*-Microsoft-Store.appx' | Select-Object -First 1
           if (-not $appx) { throw 'no Store package in the artifact' }
           # The CLI takes .msix files; .appx is the same package format.
           $msix = Join-Path $env:RUNNER_TEMP ($appx.BaseName + '.msix')
           Copy-Item $appx.FullName $msix
-          # Creates a submission from the live one with this package and commits it to certification.
+          # Creates a submission from the live one with this package (replacing any
+          # unsubmitted draft) and commits it to certification.
           msstore publish $msix -id 9PPGF42F3MDN
           if ($LASTEXITCODE) { throw "msstore publish failed ($LASTEXITCODE)" }
           "Submitted $($appx.Name) to the Microsoft Store; it goes live after certification." >> $env:GITHUB_STEP_SUMMARY
